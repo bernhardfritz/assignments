@@ -1,14 +1,14 @@
 CC = gcc
 LD = gcc
 
-OBJ = MerryGoRound.o LoadShader.o Matrix.o StringExtra.o OBJParser.o List.o
+OBJ = MerryGoRound.o LoadShader.o Vector.o Matrix.o StringExtra.o OBJParser.o List.o
 TARGET = MerryGoRound
 
 CFLAGS = -g -Wall -Wextra
 OS := $(shell uname)
 ifeq ($(OS),Darwin)
 # MacOSX
-LDLIBS=-framework GLUT -framework OpenGL
+LDLIBS=-lm -framework GLUT -framework OpenGL
 else
 # Linux
 LDLIBS=-lm -lglut -lGLEW -lGL
@@ -34,4 +34,4 @@ clean:
 .PHONY: clean
 
 # Dependencies
-$(TARGET): $(BUILD_DIR)/LoadShader.o $(BUILD_DIR)/Matrix.o $(BUILD_DIR)/StringExtra.o $(BUILD_DIR)/OBJParser.o  $(BUILD_DIR)/List.o | $(BUILD_DIR)
+$(TARGET): $(BUILD_DIR)/LoadShader.o $(BUILD_DIR)/Vector.o $(BUILD_DIR)/Matrix.o $(BUILD_DIR)/StringExtra.o $(BUILD_DIR)/OBJParser.o  $(BUILD_DIR)/List.o | $(BUILD_DIR)

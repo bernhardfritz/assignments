@@ -23,6 +23,7 @@
 /* Local includes */
 #include "LoadShader.h"   /* Provides loading function for shader code */
 #include "Matrix.h"
+#include "Vector.h"
 #include "OBJParser.h"
 
 
@@ -47,6 +48,24 @@ typedef struct {
 } object;
 
 object* objects;
+
+typedef struct {
+  float ctr[3];
+  float eye[3];
+  float up[3];
+  float u[3];
+  float v[3];
+  float w[3];
+} camera;
+
+camera cam;
+
+typedef struct {
+  int x;
+  int y;
+} position;
+
+position mouse;
 
 /* Define handle to a vertex array object */
 GLuint VAO;
@@ -225,8 +244,28 @@ void Display()
       /* Disable attributes */
       glDisableVertexAttribArray(vPosition);
     }
+
     /* Swap between front and back buffer */
     glutSwapBuffers();
+}
+
+void updateCamera() {
+  SubtractVector(cam.eye, cam.ctr, cam.w);
+  SetUnitVector(cam.w);
+  MultiplyVector(cam.up, cam.w, cam.u);
+  SetUnitVector(cam.u);
+  MultiplyVector(cam.w, cam.u, cam.v);
+
+  SetIdentityMatrix(ViewMatrix);
+  /* Set viewing transform */
+  SetTranslation(-cam.eye[0], -cam.eye[1], -cam.eye[2], ViewMatrix);
+  float temp[16] = {
+    cam.u[0], cam.u[1], cam.u[2], 0.0,
+    cam.v[0], cam.v[1], cam.v[2], 0.0,
+    cam.w[0], cam.w[1], cam.w[2], 0.0,
+         0.0,      0.0,      0.0, 1.0
+  };
+  MultiplyMatrix(temp,ViewMatrix,ViewMatrix);
 }
 
 /******************************************************************
@@ -249,6 +288,25 @@ void Mouse(int button, int state, int x, int y) {
     }
 }
 
+int once = 1;
+void Motion(int x, int y) {
+  if(once) {
+    once = 0;
+    goto done;
+  }
+  if(x == mouse.x && y == mouse.y) return;
+  //printf("x:%d y:%d\n",x,y);
+  if(x < mouse.x) SubtractVector(cam.ctr, cam.u, cam.ctr);
+  else if(x > mouse.x) AddVector(cam.ctr, cam.u, cam.ctr);
+  if(y < mouse.y) AddVector(cam.ctr, cam.up, cam.ctr);
+  else if(y > mouse.y) SubtractVector(cam.ctr, cam.up, cam.ctr);
+  updateCamera();
+  glutPostRedisplay();
+  done:
+  mouse.x = x;
+  mouse.y = y;
+}
+
 
 /******************************************************************
 *
@@ -262,10 +320,30 @@ void Mouse(int button, int state, int x, int y) {
 
 void Keyboard(unsigned char key, int x, int y) {
     switch(key) {
-	     case '1': break;
-	     case '2': break;
-       case '0': break;
-	     case 'o': break;
+	     case 'w': {
+         SubtractVector(cam.eye, cam.w, cam.eye);
+         SubtractVector(cam.ctr, cam.w, cam.ctr); break;
+       }
+	     case 'a': {
+         SubtractVector(cam.eye, cam.u, cam.eye);
+         SubtractVector(cam.ctr, cam.u, cam.ctr); break;
+       }
+       case 's': {
+         AddVector(cam.eye, cam.w, cam.eye);
+         AddVector(cam.ctr, cam.w, cam.ctr); break;
+       }
+	     case 'd': {
+         AddVector(cam.eye, cam.u, cam.eye);
+         AddVector(cam.ctr, cam.u, cam.ctr); break;
+       }
+       case 'r': {
+         AddVector(cam.eye, cam.up, cam.eye);
+         AddVector(cam.ctr, cam.up, cam.ctr); break;
+       }
+       case 'f': {
+         SubtractVector(cam.eye, cam.up, cam.eye);
+         SubtractVector(cam.ctr, cam.up, cam.ctr); break;
+       }
        case 'q':
        case 'Q': {
          for(int i=0; i<count; i++) {
@@ -278,7 +356,22 @@ void Keyboard(unsigned char key, int x, int y) {
        }
     }
 
+    updateCamera();
+
     glutPostRedisplay();
+}
+
+void Special(int key, int x, int y) {
+  switch(key) {
+    case GLUT_KEY_UP: AddVector(cam.ctr, cam.up, cam.ctr); break;
+    case GLUT_KEY_LEFT: SubtractVector(cam.ctr, cam.u, cam.ctr); break;
+    case GLUT_KEY_DOWN: SubtractVector(cam.ctr, cam.up, cam.ctr); break;
+    case GLUT_KEY_RIGHT: AddVector(cam.ctr, cam.u, cam.ctr); break;
+  }
+
+  updateCamera();
+
+  glutPostRedisplay();
 }
 
 
@@ -287,7 +380,6 @@ void Keyboard(unsigned char key, int x, int y) {
 * OnIdle
 *
 *******************************************************************/
-
 void OnIdle()
 {
     float angle = (glutGet(GLUT_ELAPSED_TIME) / 1000.0) * (180.0/M_PI);
@@ -296,13 +388,12 @@ void OnIdle()
     /* Time dependent rotation */
     SetRotationY(angle, RotationMatrixAnim);
 
-    /* Time dependent translation */
-
     /* Apply model rotation */
     for(int i=0; i<count; i++) {
       MultiplyMatrix(RotationMatrixAnim, objects[i].InitialTransform, objects[i].ModelMatrix);
     }
 
+    /* Time dependent translation */
     for(int i=6; i<count; i++) {
       float distance = sinf((angle+(i-6)*90)/16)*4;
       float TranslationMatrixAnim[16];
@@ -311,6 +402,7 @@ void OnIdle()
     }
 
     /* Request redrawing forof window content */
+
     glutPostRedisplay();
 }
 
@@ -443,7 +535,6 @@ void CreateShaderProgram()
     glUseProgram(ShaderProgram);
 }
 
-
 /******************************************************************
 *
 * Initialize
@@ -482,9 +573,13 @@ void Initialize()
     float farPlane = 100.0;
     SetPerspectiveMatrix(fovy, aspect, nearPlane, farPlane, ProjectionMatrix);
 
-    /* Set viewing transform */
-    float camera_disp = -50.0;
-    SetTranslation(0.0, 0.0, camera_disp, ViewMatrix);
+    /* Initialize camera */
+    cam.ctr[0] = 0.0; cam.ctr[1] = 0.0; cam.ctr[2] = 0.0;
+    cam.eye[0] = 0.0; cam.eye[1] = 0.0; cam.eye[2] = 50.0;
+    cam.up[0] = 0.0; cam.up[1] = 1.0; cam.up[2] = 0.0;
+    updateCamera();
+
+    printf("width:%d height:%d\n",GLUT_WINDOW_WIDTH,GLUT_WINDOW_HEIGHT);
 
     // translate bottom plane
     SetTranslation(0, 0, 10, objects[0].TranslateOrigin);
@@ -632,7 +727,9 @@ int main(int argc, char** argv)
     glutIdleFunc(OnIdle);
     glutDisplayFunc(Display);
     glutKeyboardFunc(Keyboard);
+    glutSpecialFunc(Special);
     glutMouseFunc(Mouse);
+    glutMotionFunc(Motion);
     glutMainLoop();
 
     /* ISO C requires main to return int */
