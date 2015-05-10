@@ -98,6 +98,61 @@ float ViewMatrix[16]; /* Camera view matrix */
 /* Transformation matrices for initial position */
 float TranslateDown[16];
 
+void generateCuboidVertexBuffer(GLfloat* result, GLfloat width, GLfloat length, GLfloat height) {
+  GLfloat temp[24] = {
+    width/2.0,          height/2.0,         length/2.0,
+    width/2.0,          height/2.0,         -length/2.0,
+    width/2.0,          -height/2.0,        length/2.0,
+    width/2.0,          -height/2.0,        -length/2.0,
+    -width/2.0,         height/2.0,         length/2.0,
+    -width/2.0,         height/2.0,         -length/2.0,
+    -width/2.0,         -height/2.0,        length/2.0,
+    -width/2.0,         -height/2.0,        -length/2.0
+  };
+
+  memcpy(result, temp, 24*sizeof(GLfloat));
+}
+
+void generateCuboidColorBuffer(GLfloat* result) {
+  GLfloat temp[24] = {
+    0.0, 0.0, 0.0,
+    0.0, 0.0, 0.1,
+    0.0, 1.0, 0.0,
+    0.0, 1.0, 1.0,
+    1.0, 0.0, 0.0,
+    1.0, 0.0, 1.0,
+    1.0, 1.0, 0.0,
+    1.0, 1.0, 1.0
+  };
+
+  memcpy(result, temp, 24*sizeof(GLfloat));
+}
+
+void generateCuboidIndexBuffer(GLushort* result) {
+  GLushort temp[48] = {
+    0, 1, 2,
+    1, 2, 3,
+    1, 3, 5,
+    3, 5, 7,
+    4, 5, 7,
+    4, 6, 7,
+    0, 3, 6,
+    0, 5, 6,
+    0, 1, 4,
+    1, 4, 5,
+    2, 3, 6,
+    3, 6, 7
+  };
+
+  memcpy(result, temp, 48*sizeof(GLushort));
+}
+
+void generateCuboid(GLfloat* result_vertex_buffer_data, GLushort* result_index_buffer_data, GLfloat* result_color_buffer_data, GLfloat width, GLfloat length, GLfloat height) {
+  generateCuboidVertexBuffer(result_vertex_buffer_data, width, length, height);
+  generateCuboidIndexBuffer(result_index_buffer_data);
+  generateCuboidColorBuffer(result_color_buffer_data);
+}
+
 void generateOctagonalPrismVertexBuffer(GLfloat* result, GLfloat radius, GLfloat height) {
   GLfloat temp[54] = {
     0.0               , 0.0               , -height/2.0,
@@ -418,7 +473,7 @@ void OnIdle()
     }
 
     /* Time dependent translation */
-    for(int i=6; i<count; i++) {
+    for(int i=11; i<count; i++) {
       float distance = sinf((angle+(i-6)*90)/16)*4;
       float TranslationMatrixAnim[16];
       SetTranslation(0, distance, 0, TranslationMatrixAnim);
@@ -598,13 +653,14 @@ void Initialize()
     SetIdentityMatrix(ViewMatrix);
     for(int i=0; i<count; i++) {
       SetIdentityMatrix(objects[i].ModelMatrix);
+      SetIdentityMatrix(objects[i].InitialTransform);
     }
 
     /* Set projection transform */
     float fovy = 45.0;
     float aspect = 1.0;
     float nearPlane = 1.0;
-    float farPlane = 100.0;
+    float farPlane = 200.0;
     SetPerspectiveMatrix(fovy, aspect, nearPlane, farPlane, ProjectionMatrix);
 
     /* Initialize camera */
@@ -645,33 +701,48 @@ void Initialize()
     SetRotationX(90, objects[5].RotateX);
     MultiplyMatrix(objects[5].RotateX, objects[5].TranslateOrigin, objects[5].InitialTransform);
 
+    // transate first cuboid (floor)
+    SetTranslation(0, -12.5, 0, objects[6].InitialTransform);
+
+    // translate second cuboid (wall)
+    SetTranslation(0.0, 1.25, 48.875, objects[7].InitialTransform);
+
+    // translate third cuboid (wall)
+    SetTranslation(0.0, 1.25, -48.875, objects[8].InitialTransform);
+
+    // translate fourth cuboid (wall)
+    SetTranslation(48.875, 1.25, 0.0, objects[9].InitialTransform);
+
+    // translate fifth cuboid (wall)
+    SetTranslation(-48.875, 1.25, 0.0, objects[10].InitialTransform);
+
     // rotate, translate and scale first teddy
-    SetTranslation(-50, 0, 0, objects[6].TranslateOrigin);
-    SetRotationY(0, objects[6].RotateY);
-    SetUniformScale(0.25, objects[6].UniformScale);
-    MultiplyMatrix(objects[6].RotateY, objects[6].TranslateOrigin, objects[6].InitialTransform);
-    MultiplyMatrix(objects[6].UniformScale, objects[6].InitialTransform, objects[6].InitialTransform);
+    SetTranslation(-50, 0, 0, objects[11].TranslateOrigin);
+    SetRotationY(0, objects[11].RotateY);
+    SetUniformScale(0.25, objects[11].UniformScale);
+    MultiplyMatrix(objects[11].RotateY, objects[11].TranslateOrigin, objects[11].InitialTransform);
+    MultiplyMatrix(objects[11].UniformScale, objects[11].InitialTransform, objects[11].InitialTransform);
 
     // rotate, translate and scale second teddy
-    SetTranslation(-50, 0, 0, objects[7].TranslateOrigin);
-    SetRotationY(90, objects[7].RotateY);
-    SetUniformScale(0.25, objects[7].UniformScale);
-    MultiplyMatrix(objects[7].RotateY, objects[7].TranslateOrigin, objects[7].InitialTransform);
-    MultiplyMatrix(objects[7].UniformScale, objects[7].InitialTransform, objects[7].InitialTransform);
+    SetTranslation(-50, 0, 0, objects[12].TranslateOrigin);
+    SetRotationY(90, objects[12].RotateY);
+    SetUniformScale(0.25, objects[12].UniformScale);
+    MultiplyMatrix(objects[12].RotateY, objects[12].TranslateOrigin, objects[12].InitialTransform);
+    MultiplyMatrix(objects[12].UniformScale, objects[12].InitialTransform, objects[12].InitialTransform);
 
     // rotate, translate and scale third teddy
-    SetTranslation(-50, 0, 0, objects[8].TranslateOrigin);
-    SetRotationY(180, objects[8].RotateY);
-    SetUniformScale(0.25, objects[8].UniformScale);
-    MultiplyMatrix(objects[8].RotateY, objects[8].TranslateOrigin, objects[8].InitialTransform);
-    MultiplyMatrix(objects[8].UniformScale, objects[8].InitialTransform, objects[8].InitialTransform);
+    SetTranslation(-50, 0, 0, objects[13].TranslateOrigin);
+    SetRotationY(180, objects[13].RotateY);
+    SetUniformScale(0.25, objects[13].UniformScale);
+    MultiplyMatrix(objects[13].RotateY, objects[13].TranslateOrigin, objects[13].InitialTransform);
+    MultiplyMatrix(objects[13].UniformScale, objects[13].InitialTransform, objects[13].InitialTransform);
 
     // rotate, translate and scale fourth teddy
-    SetTranslation(-50, 0, 0, objects[9].TranslateOrigin);
-    SetRotationY(270, objects[9].RotateY);
-    SetUniformScale(0.25, objects[9].UniformScale);
-    MultiplyMatrix(objects[9].RotateY, objects[9].TranslateOrigin, objects[9].InitialTransform);
-    MultiplyMatrix(objects[9].UniformScale, objects[9].InitialTransform, objects[9].InitialTransform);
+    SetTranslation(-50, 0, 0, objects[14].TranslateOrigin);
+    SetRotationY(270, objects[14].RotateY);
+    SetUniformScale(0.25, objects[14].UniformScale);
+    MultiplyMatrix(objects[14].RotateY, objects[14].TranslateOrigin, objects[14].InitialTransform);
+    MultiplyMatrix(objects[14].UniformScale, objects[14].InitialTransform, objects[14].InitialTransform);
 }
 
 
@@ -685,7 +756,7 @@ void Initialize()
 
 int main(int argc, char** argv)
 {
-    count = 10;
+    count = 15;
     objects = malloc(count*sizeof(object));
 
     for(int i=0; i<6; i++) {
@@ -702,38 +773,51 @@ int main(int argc, char** argv)
     generateOctagonalPrism(objects[4].vertex_buffer_data,objects[4].index_buffer_data,objects[4].color_buffer_data,1.0,20);
     generateOctagonalPrism(objects[5].vertex_buffer_data,objects[5].index_buffer_data,objects[5].color_buffer_data,1.0,20);
 
+    for(int i=6; i<11; i++) {
+      objects[i].vertices = 8;
+      objects[i].faces = 12;
+      objects[i].vertex_buffer_data = malloc(objects[i].vertices*3*sizeof(GLfloat));
+      objects[i].index_buffer_data = malloc(objects[i].faces*3*sizeof(GLushort));
+      objects[i].color_buffer_data = malloc(objects[i].vertices*3*sizeof(GLfloat));
+    }
+    generateCuboid(objects[6].vertex_buffer_data,objects[6].index_buffer_data,objects[6].color_buffer_data,100.0,100.0,2.5);
+    generateCuboid(objects[7].vertex_buffer_data,objects[7].index_buffer_data,objects[7].color_buffer_data,100.0,2.5,25.0);
+    generateCuboid(objects[8].vertex_buffer_data,objects[8].index_buffer_data,objects[8].color_buffer_data,100.0,2.5,25.0);
+    generateCuboid(objects[9].vertex_buffer_data,objects[9].index_buffer_data,objects[9].color_buffer_data,2.5,100.0,25.0);
+    generateCuboid(objects[10].vertex_buffer_data,objects[10].index_buffer_data,objects[10].color_buffer_data,2.5,100.0,25.0);
+
     char* fname="models/teddy.obj";
     obj_scene_data data;
     parse_obj_scene(&data, fname);
 
-    objects[6].vertices = data.vertex_count;
-    objects[6].faces = data.face_count;
+    objects[11].vertices = data.vertex_count;
+    objects[11].faces = data.face_count;
     //printf("%d %d\n",objects[6].vertices,objects[6].faces);
-    objects[6].vertex_buffer_data = malloc(objects[6].vertices*3*sizeof(GLfloat));
-    objects[6].index_buffer_data = malloc(objects[6].faces*3*sizeof(GLushort));
-    objects[6].color_buffer_data = malloc(objects[6].vertices*3*sizeof(GLfloat));
+    objects[11].vertex_buffer_data = malloc(objects[11].vertices*3*sizeof(GLfloat));
+    objects[11].index_buffer_data = malloc(objects[11].faces*3*sizeof(GLushort));
+    objects[11].color_buffer_data = malloc(objects[11].vertices*3*sizeof(GLfloat));
     // Vertices
-    for(int i=0; i<objects[6].vertices; i++) {
-        objects[6].vertex_buffer_data[i*3] = (GLfloat)(*data.vertex_list[i]).e[0];
-	      objects[6].vertex_buffer_data[i*3+1] = (GLfloat)(*data.vertex_list[i]).e[1];
-	      objects[6].vertex_buffer_data[i*3+2] = (GLfloat)(*data.vertex_list[i]).e[2];
+    for(int i=0; i<objects[11].vertices; i++) {
+        objects[11].vertex_buffer_data[i*3] = (GLfloat)(*data.vertex_list[i]).e[0];
+	      objects[11].vertex_buffer_data[i*3+1] = (GLfloat)(*data.vertex_list[i]).e[1];
+	      objects[11].vertex_buffer_data[i*3+2] = (GLfloat)(*data.vertex_list[i]).e[2];
     }
     // Indices
-    for(int i=0; i<objects[6].faces; i++) {
-	      objects[6].index_buffer_data[i*3] = (GLushort)(*data.face_list[i]).vertex_index[0];
-	      objects[6].index_buffer_data[i*3+1] = (GLushort)(*data.face_list[i]).vertex_index[1];
-	      objects[6].index_buffer_data[i*3+2] = (GLushort)(*data.face_list[i]).vertex_index[2];
+    for(int i=0; i<objects[11].faces; i++) {
+	      objects[11].index_buffer_data[i*3] = (GLushort)(*data.face_list[i]).vertex_index[0];
+	      objects[11].index_buffer_data[i*3+1] = (GLushort)(*data.face_list[i]).vertex_index[1];
+	      objects[11].index_buffer_data[i*3+2] = (GLushort)(*data.face_list[i]).vertex_index[2];
     }
 
-    for(int i=7; i<10; i++) {
-      objects[i].vertices = objects[6].vertices;
-      objects[i].faces = objects[6].faces;
+    for(int i=12; i<15; i++) {
+      objects[i].vertices = objects[11].vertices;
+      objects[i].faces = objects[11].faces;
       objects[i].vertex_buffer_data = malloc(objects[i].vertices*3*sizeof(GLfloat));
       objects[i].index_buffer_data = malloc(objects[i].faces*3*sizeof(GLushort));
       objects[i].color_buffer_data = malloc(objects[i].vertices*3*sizeof(GLfloat));
-      memcpy(objects[i].vertex_buffer_data, objects[6].vertex_buffer_data, objects[6].vertices*3*sizeof(GLfloat));
-      memcpy(objects[i].index_buffer_data, objects[6].index_buffer_data, objects[6].faces*3*sizeof(GLushort));
-      memcpy(objects[i].color_buffer_data, objects[6].color_buffer_data, objects[6].vertices*3*sizeof(GLfloat));
+      memcpy(objects[i].vertex_buffer_data, objects[11].vertex_buffer_data, objects[11].vertices*3*sizeof(GLfloat));
+      memcpy(objects[i].index_buffer_data, objects[11].index_buffer_data, objects[11].faces*3*sizeof(GLushort));
+      memcpy(objects[i].color_buffer_data, objects[11].color_buffer_data, objects[11].vertices*3*sizeof(GLfloat));
     }
 
     /* Initialize GLUT; set double buffered window and RGBA color model */
