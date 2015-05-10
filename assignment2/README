@@ -1,0 +1,24 @@
+Instructions
+============
+open terminal and type:
+make
+./MerryGoRound
+
+Keys
+====
+w - move camera forward
+a - strafe camera left
+s - move camera backward
+d - strafe camera right
+r - move camera upward
+f - move camera downward
+c - automatic camera movement
+(press c again to toggle direction while moving)
+q - quit
+
+Mouse
+=====
+drag (click and move) mouse for a fully free camera movement
+
+
+Compiled and executed in RR15
