@@ -24,6 +24,7 @@
 #include "LoadShader.h"   /* Provides loading function for shader code */
 #include "Matrix.h"
 #include "Vector.h"
+#include "Bezier.h"
 #include "OBJParser.h"
 
 
@@ -59,6 +60,16 @@ typedef struct {
 } camera;
 
 camera cam;
+
+// variables for camera path
+// =========================
+active = 0;
+direction = -1;
+float p1[3] = { 50.0, 50.0, 50.0};
+float p2[3] = { 50.0, 50.0,  0.0};
+float p3[3] = { 50.0,  0.0,  0.0};
+float t = 0.0;
+// =========================
 
 typedef struct {
   int x;
@@ -322,27 +333,39 @@ void Keyboard(unsigned char key, int x, int y) {
     switch(key) {
 	     case 'w': {
          SubtractVector(cam.eye, cam.w, cam.eye);
-         SubtractVector(cam.ctr, cam.w, cam.ctr); break;
+         SubtractVector(cam.ctr, cam.w, cam.ctr);
+         break;
        }
 	     case 'a': {
          SubtractVector(cam.eye, cam.u, cam.eye);
-         SubtractVector(cam.ctr, cam.u, cam.ctr); break;
+         SubtractVector(cam.ctr, cam.u, cam.ctr);
+         break;
        }
        case 's': {
          AddVector(cam.eye, cam.w, cam.eye);
-         AddVector(cam.ctr, cam.w, cam.ctr); break;
+         AddVector(cam.ctr, cam.w, cam.ctr);
+         break;
        }
 	     case 'd': {
          AddVector(cam.eye, cam.u, cam.eye);
-         AddVector(cam.ctr, cam.u, cam.ctr); break;
+         AddVector(cam.ctr, cam.u, cam.ctr);
+         break;
        }
        case 'r': {
          AddVector(cam.eye, cam.up, cam.eye);
-         AddVector(cam.ctr, cam.up, cam.ctr); break;
+         AddVector(cam.ctr, cam.up, cam.ctr);
+         break;
        }
        case 'f': {
          SubtractVector(cam.eye, cam.up, cam.eye);
-         SubtractVector(cam.ctr, cam.up, cam.ctr); break;
+         SubtractVector(cam.ctr, cam.up, cam.ctr);
+         break;
+       }
+       case 'c': {
+         active = 1;
+         direction *= -1;
+         cam.eye[0]=p1[0]; cam.eye[1]=p1[1]; cam.eye[2]=p1[2];
+         break;
        }
        case 'q':
        case 'Q': {
@@ -352,7 +375,8 @@ void Keyboard(unsigned char key, int x, int y) {
             free(objects[i].color_buffer_data);
           }
           free(objects);
-          exit(0); break;
+          exit(0);
+          break;
        }
     }
 
@@ -401,6 +425,16 @@ void OnIdle()
       MultiplyMatrix(TranslationMatrixAnim, objects[i].ModelMatrix, objects[i].ModelMatrix);
     }
 
+    if(active) {
+      quadratic_bezier(cam.eye, p1, p2, p3, t);
+      updateCamera();
+      cam.ctr[0]=0.0; cam.ctr[1]=0.0; cam.ctr[2]=0.0;
+      if((direction==1 && t>=1.0) || (direction==-1 && t<=0.0)) {
+        active=0;
+      } else {
+        t+=direction*0.01;
+      }
+    }
     /* Request redrawing forof window content */
 
     glutPostRedisplay();
@@ -579,7 +613,7 @@ void Initialize()
     cam.up[0] = 0.0; cam.up[1] = 1.0; cam.up[2] = 0.0;
     updateCamera();
 
-    printf("width:%d height:%d\n",GLUT_WINDOW_WIDTH,GLUT_WINDOW_HEIGHT);
+    //printf("width:%d height:%d\n",GLUT_WINDOW_WIDTH,GLUT_WINDOW_HEIGHT);
 
     // translate bottom plane
     SetTranslation(0, 0, 10, objects[0].TranslateOrigin);
