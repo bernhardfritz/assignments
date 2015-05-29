@@ -22,6 +22,7 @@
 
 /* Local includes */
 #include "LoadShader.h"   /* Provides loading function for shader code */
+#include "Mesh.h"
 #include "Matrix.h"
 #include "Vector.h"
 #include "Bezier.h"
@@ -31,15 +32,17 @@
 /*----------------------------------------------------------------*/
 
 typedef struct {
+  mesh* m;
   GLuint VBO;
   GLuint IBO;
   GLuint CBO;
+  GLuint NBO;
   int vertices;
   int faces;
   GLfloat* vertex_buffer_data;
   GLushort* index_buffer_data;
   GLfloat* color_buffer_data;
-  GLfloat* normals;
+  GLfloat* normal_buffer_data;
   float ModelMatrix[16];
   float TranslateOrigin[16];
   float RotateX[16];
@@ -52,12 +55,12 @@ typedef struct {
 object* objects;
 
 typedef struct {
-  float ctr[3];
-  float eye[3];
-  float up[3];
-  float u[3];
-  float v[3];
-  float w[3];
+  vector* ctr;
+  vector* eye;
+  vector* up;
+  vector* u;
+  vector* v;
+  vector* w;
 } camera;
 
 camera cam;
@@ -66,10 +69,10 @@ camera cam;
 // =========================
 active = 0;
 direction = -1;
-float p1[3] = { 50.0, 50.0, 50.0};
-float p2[3] = { 50.0, 50.0,  0.0};
-float p3[3] = { 50.0,  0.0,  0.0};
 float t = 0.0;
+vector* p1;
+vector* p2;
+vector* p3;
 // =========================
 
 typedef struct {
@@ -85,7 +88,7 @@ GLuint VAO;
 int count = 0;
 
 /* Indices to vertex attributes; in this case positon and color */
-enum DataID {vPosition = 0, vColor = 1};
+enum DataID {vPosition = 0, vColor = 1, vNormal = 2};
 
 /* Strings for loading and storing shader code */
 static const char* VertexShaderString;
@@ -99,26 +102,6 @@ float ViewMatrix[16]; /* Camera view matrix */
 /* Transformation matrices for initial position */
 float TranslateDown[16];
 
-void computeTriangleNormals(GLfloat* input, GLfloat* output, faces) {
-  GLfloat temp[faces*3];
-  for(int i=0; i<faces; i++) {
-    GLfloat v1[] = {input[i*9+0],input[i*9+1],input[i*9+2]};
-    GLfloat v2[] = {input[i*9+3],input[i*9+4],input[i*9+5]};
-    GLfloat v3[] = {input[i*9+6],input[i*9+7],input[i*9+8]};
-    GLfloat v2sv1[3];
-    SubtractVector(v2, v1, v2sv1);
-    GLfloat v3sv1[3];
-    SubtractVector(v3, v1, v3sv1);
-    GLfloat n[3];
-    MultiplyVector(v2sv1, v3sv1, n);
-    SetUnitVector(n);
-    temp[i*3+0] = n[0];
-    temp[i*3+1] = n[1];
-    temp[i*3+2] = n[2];
-  }
-
-  memcpy(output, temp, faces*3*sizeof(GLfloat));
-}
 void generateGeneralColorBuffer(GLfloat* result, int vertices, GLfloat r, GLfloat g, GLfloat b) {
   GLfloat temp[vertices*3];
   for(int i=0; i<vertices; i++) {
@@ -164,11 +147,11 @@ void generateCuboidIndexBuffer(GLushort* result) {
   memcpy(result, temp, 48*sizeof(GLushort));
 }
 
-void generateCuboid(GLfloat* result_vertex_buffer_data, GLushort* result_index_buffer_data, GLfloat* result_color_buffer_data, GLfloat* result_normals, GLfloat width, GLfloat length, GLfloat height, GLfloat r, GLfloat g, GLfloat b) {
-  generateCuboidVertexBuffer(result_vertex_buffer_data, width, length, height);
-  generateCuboidIndexBuffer(result_index_buffer_data);
-  generateGeneralColorBuffer(result_color_buffer_data, 8, r, g, b);
-  computeTriangleNormals(result_vertex_buffer_data,result_normals,12);
+void generateCuboid(object* obj, GLfloat width, GLfloat length, GLfloat height, GLfloat r, GLfloat g, GLfloat b) {
+  generateCuboidVertexBuffer(obj->vertex_buffer_data, width, length, height);
+  generateCuboidIndexBuffer(obj->index_buffer_data);
+  generateGeneralColorBuffer(obj->color_buffer_data, obj->vertices, r, g, b);
+  obj->m = createMesh(obj->vertex_buffer_data, obj->index_buffer_data, obj->color_buffer_data, obj->faces, obj->vertices);
 }
 
 void generateOctagonalPrismVertexBuffer(GLfloat* result, GLfloat radius, GLfloat height) {
@@ -235,11 +218,11 @@ void generateOctagonalPrismIndexBuffer(GLushort* result) {
   memcpy(result, temp, 96*sizeof(GLushort));
 }
 
-void generateOctagonalPrism(GLfloat* result_vertex_buffer_data, GLushort* result_index_buffer_data, GLfloat* result_color_buffer_data, GLfloat* result_normals, GLfloat radius, GLfloat height, GLfloat r, GLfloat g, GLfloat b) {
-  generateOctagonalPrismVertexBuffer(result_vertex_buffer_data, radius, height);
-  generateOctagonalPrismIndexBuffer(result_index_buffer_data);
-  generateGeneralColorBuffer(result_color_buffer_data, 18, r, g, b);
-  computeTriangleNormals(result_vertex_buffer_data,result_normals,32);
+void generateOctagonalPrism(object* obj, GLfloat radius, GLfloat height, GLfloat r, GLfloat g, GLfloat b) {
+  generateOctagonalPrismVertexBuffer(obj->vertex_buffer_data, radius, height);
+  generateOctagonalPrismIndexBuffer(obj->index_buffer_data);
+  generateGeneralColorBuffer(obj->color_buffer_data, obj->vertices, r, g, b);
+  obj->m = createMesh(obj->vertex_buffer_data, obj->index_buffer_data, obj->color_buffer_data, obj->faces, obj->vertices);
 }
 
 /*----------------------------------------------------------------*/
@@ -269,6 +252,10 @@ void Display()
       glEnableVertexAttribArray(vColor);
       glBindBuffer(GL_ARRAY_BUFFER, objects[i].CBO);
       glVertexAttribPointer(vColor, 3, GL_FLOAT,GL_FALSE, 0, 0);
+
+      glEnableVertexAttribArray(vNormal);
+      glBindBuffer(GL_ARRAY_BUFFER, objects[i].NBO);
+      glVertexAttribPointer(vNormal, 3, GL_FLOAT, GL_FALSE, 0, 0);
 
       glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, objects[i].IBO);
       GLint size;
@@ -308,6 +295,7 @@ void Display()
       /* Disable attributes */
       glDisableVertexAttribArray(vPosition);
       glDisableVertexAttribArray(vColor);
+      glDisableVertexAttribArray(vNormal);
     }
 
     /* Swap between front and back buffer */
@@ -323,11 +311,11 @@ void updateCamera() {
 
   SetIdentityMatrix(ViewMatrix);
   /* Set viewing transform */
-  SetTranslation(-cam.eye[0], -cam.eye[1], -cam.eye[2], ViewMatrix);
+  SetTranslation(-(*cam.eye->x), -(*cam.eye->y), -(*cam.eye->z), ViewMatrix);
   float temp[16] = {
-    cam.u[0], cam.u[1], cam.u[2], 0.0,
-    cam.v[0], cam.v[1], cam.v[2], 0.0,
-    cam.w[0], cam.w[1], cam.w[2], 0.0,
+    *cam.u->x, *cam.u->y, *cam.u->z, 0.0,
+    *cam.v->x, *cam.v->y, *cam.v->z, 0.0,
+    *cam.w->x, *cam.w->y, *cam.w->z, 0.0,
          0.0,      0.0,      0.0, 1.0
   };
   MultiplyMatrix(temp,ViewMatrix,ViewMatrix);
@@ -418,7 +406,7 @@ void Keyboard(unsigned char key, int x, int y) {
        case 'c': {
          active = 1;
          direction *= -1;
-         cam.eye[0]=p1[0]; cam.eye[1]=p1[1]; cam.eye[2]=p1[2];
+         *cam.eye->x=(*p1->x); *cam.eye->y=(*p1->y); *cam.eye->z=(*p1->z);
          break;
        }
        case 'q':
@@ -427,8 +415,19 @@ void Keyboard(unsigned char key, int x, int y) {
             free(objects[i].vertex_buffer_data);
             free(objects[i].index_buffer_data);
             free(objects[i].color_buffer_data);
+            free(objects[i].normal_buffer_data);
+            destroyMesh(objects[i].m);
           }
           free(objects);
+          destroyVector(p1);
+          destroyVector(p2);
+          destroyVector(p3);
+          destroyVector(cam.ctr);
+          destroyVector(cam.eye);
+          destroyVector(cam.up);
+          destroyVector(cam.u);
+          destroyVector(cam.v);
+          destroyVector(cam.w);
           exit(0);
           break;
        }
@@ -482,7 +481,7 @@ void OnIdle()
     if(active) {
       quadratic_bezier(cam.eye, p1, p2, p3, t);
       updateCamera();
-      cam.ctr[0]=0.0; cam.ctr[1]=0.0; cam.ctr[2]=0.0;
+      *cam.ctr->x=0.0f; *cam.ctr->y=0.0f; *cam.ctr->z=0.0f;
       if((direction==1 && t>=1.0) || (direction==-1 && t<=0.0)) {
         active=0;
       } else {
@@ -524,6 +523,12 @@ void SetupDataBuffers()
       glGenBuffers(1, &objects[i].CBO);
       glBindBuffer(GL_ARRAY_BUFFER, objects[i].CBO);
       glBufferData(GL_ARRAY_BUFFER, objects[i].vertices*3*sizeof(GLfloat), objects[i].color_buffer_data, GL_STATIC_DRAW);
+    }
+
+    for(int i=0; i<count; i++) {
+      glGenBuffers(1, &objects[i].NBO);
+      glBindBuffer(GL_ARRAY_BUFFER, objects[i].NBO);
+      glBufferData(GL_ARRAY_BUFFER, objects[i].vertices*3*sizeof(GLfloat), objects[i].normal_buffer_data, GL_STATIC_DRAW);
     }
 }
 
@@ -663,12 +668,6 @@ void Initialize()
     glLightfv(GL_LIGHT1, GL_DIFFUSE, lightColor1);
     glLightfv(GL_LIGHT1, GL_POSITION, lightPos1);
 
-    glEnable(GL_NORMALIZE);
-
-    glShadeModel(GL_FLAT);
-    glProvokingVertex(GL_FIRST_VERTEX_CONVENTION);
-    glShadeModel(GL_SMOOTH);
-
     /* Setup vertex, color, and index buffer objects */
     SetupDataBuffers();
 
@@ -691,9 +690,15 @@ void Initialize()
     SetPerspectiveMatrix(fovy, aspect, nearPlane, farPlane, ProjectionMatrix);
 
     /* Initialize camera */
-    cam.ctr[0] = 0.0; cam.ctr[1] = 0.0; cam.ctr[2] = 0.0;
-    cam.eye[0] = 0.0; cam.eye[1] = 0.0; cam.eye[2] = 50.0;
-    cam.up[0] = 0.0; cam.up[1] = 1.0; cam.up[2] = 0.0;
+    p1 = createVector(50.0f, 50.0f, 50.0f); // camera path
+    p2 = createVector(50.0f, 50.0f,  0.0f); // camera path
+    p3 = createVector(50.0f,  0.0f,  0.0f); // camera path
+    cam.ctr = createVector(0.0f, 0.0f, 0.0f);
+    cam.eye = createVector(0.0f, 0.0f, 50.0f);
+    cam.up = createVector(0.0f, 1.0f, 0.0f);
+    cam.u = createVector(0.0f, 0.0f, 0.0f);
+    cam.v = createVector(0.0f, 0.0f, 0.0f);
+    cam.w = createVector(0.0f, 0.0f, 0.0f);
     updateCamera();
 
     //printf("width:%d height:%d\n",GLUT_WINDOW_WIDTH,GLUT_WINDOW_HEIGHT);
@@ -792,14 +797,14 @@ int main(int argc, char** argv)
       objects[i].vertex_buffer_data = malloc(objects[i].vertices*3*sizeof(GLfloat));
       objects[i].index_buffer_data = malloc(objects[i].faces*3*sizeof(GLfloat));
       objects[i].color_buffer_data = malloc(objects[i].vertices*3*sizeof(GLfloat));
-      objects[i].normals = malloc(objects[i].faces*3*sizeof(GLfloat));
+      objects[i].normal_buffer_data = malloc(objects[i].vertices*3*sizeof(GLfloat));
     }
-    generateOctagonalPrism(objects[0].vertex_buffer_data,objects[0].index_buffer_data,objects[0].color_buffer_data,objects[0].normals,20.0,2.5,0.5f,0.5f,0.5f);
-    generateOctagonalPrism(objects[1].vertex_buffer_data,objects[1].index_buffer_data,objects[1].color_buffer_data,objects[1].normals,20.0,2.5,0.5f,0.5f,0.5f);
-    generateOctagonalPrism(objects[2].vertex_buffer_data,objects[2].index_buffer_data,objects[2].color_buffer_data,objects[2].normals,1.0,20,1.0f,0.0f,0.0f);
-    generateOctagonalPrism(objects[3].vertex_buffer_data,objects[3].index_buffer_data,objects[3].color_buffer_data,objects[3].normals,1.0,20,1.0f,0.0f,0.0f);
-    generateOctagonalPrism(objects[4].vertex_buffer_data,objects[4].index_buffer_data,objects[4].color_buffer_data,objects[4].normals,1.0,20,1.0f,0.0f,0.0f);
-    generateOctagonalPrism(objects[5].vertex_buffer_data,objects[5].index_buffer_data,objects[5].color_buffer_data,objects[5].normals,1.0,20,1.0f,0.0f,0.0f);
+    generateOctagonalPrism(&objects[0],20.0,2.5,0.5f,0.5f,0.5f);
+    generateOctagonalPrism(&objects[1],20.0,2.5,0.5f,0.5f,0.5f);
+    generateOctagonalPrism(&objects[2],1.0,20,1.0f,0.0f,0.0f);
+    generateOctagonalPrism(&objects[3],1.0,20,1.0f,0.0f,0.0f);
+    generateOctagonalPrism(&objects[4],1.0,20,1.0f,0.0f,0.0f);
+    generateOctagonalPrism(&objects[5],1.0,20,1.0f,0.0f,0.0f);
 
     for(int i=6; i<11; i++) {
       objects[i].vertices = 8;
@@ -807,13 +812,13 @@ int main(int argc, char** argv)
       objects[i].vertex_buffer_data = malloc(objects[i].vertices*3*sizeof(GLfloat));
       objects[i].index_buffer_data = malloc(objects[i].faces*3*sizeof(GLushort));
       objects[i].color_buffer_data = malloc(objects[i].vertices*3*sizeof(GLfloat));
-      objects[i].normals = malloc(objects[i].faces*3*sizeof(GLfloat));
+      objects[i].normal_buffer_data = malloc(objects[i].vertices*3*sizeof(GLfloat));
     }
-    generateCuboid(objects[6].vertex_buffer_data,objects[6].index_buffer_data,objects[6].color_buffer_data,objects[6].normals,100.0,100.0,2.5,0.0f,1.0f,0.0f);
-    generateCuboid(objects[7].vertex_buffer_data,objects[7].index_buffer_data,objects[7].color_buffer_data,objects[7].normals,100.0,2.5,25.0,0.0f,0.0f,1.0f);
-    generateCuboid(objects[8].vertex_buffer_data,objects[8].index_buffer_data,objects[8].color_buffer_data,objects[8].normals,100.0,2.5,25.0,0.0f,0.0f,1.0f);
-    generateCuboid(objects[9].vertex_buffer_data,objects[9].index_buffer_data,objects[9].color_buffer_data,objects[9].normals,2.5,100.0,25.0,0.0f,0.0f,1.0f);
-    generateCuboid(objects[10].vertex_buffer_data,objects[10].index_buffer_data,objects[10].color_buffer_data,objects[10].normals,2.5,100.0,25.0,0.0f,0.0f,1.0f);
+    generateCuboid(&objects[6],100.0,100.0,2.5,0.0f,1.0f,0.0f);
+    generateCuboid(&objects[7],100.0,2.5,25.0,0.0f,0.0f,1.0f);
+    generateCuboid(&objects[8],100.0,2.5,25.0,0.0f,0.0f,1.0f);
+    generateCuboid(&objects[9],2.5,100.0,25.0,0.0f,0.0f,1.0f);
+    generateCuboid(&objects[10],2.5,100.0,25.0,0.0f,0.0f,1.0f);
 
     char* fname="models/teddy.obj";
     obj_scene_data data;
@@ -821,11 +826,11 @@ int main(int argc, char** argv)
 
     objects[11].vertices = data.vertex_count;
     objects[11].faces = data.face_count;
-    //printf("%d %d\n",objects[6].vertices,objects[6].faces);
+    //printf("%d %d\n",objects[11].vertices,objects[11].faces);
     objects[11].vertex_buffer_data = malloc(objects[11].vertices*3*sizeof(GLfloat));
     objects[11].index_buffer_data = malloc(objects[11].faces*3*sizeof(GLushort));
     objects[11].color_buffer_data = malloc(objects[11].vertices*3*sizeof(GLfloat));
-    objects[11].normals = malloc(objects[11].faces*3*sizeof(GLfloat));
+    objects[11].normal_buffer_data = malloc(objects[11].vertices*3*sizeof(GLfloat));
     // Vertices
     for(int i=0; i<objects[11].vertices; i++) {
         objects[11].vertex_buffer_data[i*3] = (GLfloat)(*data.vertex_list[i]).e[0];
@@ -839,7 +844,7 @@ int main(int argc, char** argv)
 	      objects[11].index_buffer_data[i*3+2] = (GLushort)(*data.face_list[i]).vertex_index[2];
     }
     generateGeneralColorBuffer(objects[11].color_buffer_data, objects[11].vertices, 0.5f, 0.35f, 0.05f);
-    computeTriangleNormals(objects[11].vertex_buffer_data,objects[11].normals,objects[11].faces);
+    objects[11].m = createMesh(objects[11].vertex_buffer_data, objects[11].index_buffer_data, objects[11].color_buffer_data, objects[11].vertices, objects[11].faces);
 
     for(int i=12; i<15; i++) {
       objects[i].vertices = objects[11].vertices;
@@ -847,11 +852,12 @@ int main(int argc, char** argv)
       objects[i].vertex_buffer_data = malloc(objects[i].vertices*3*sizeof(GLfloat));
       objects[i].index_buffer_data = malloc(objects[i].faces*3*sizeof(GLushort));
       objects[i].color_buffer_data = malloc(objects[i].vertices*3*sizeof(GLfloat));
-      objects[i].normals = malloc(objects[i].faces*3*sizeof(GLfloat));
+      objects[i].normal_buffer_data = malloc(objects[i].vertices*3*sizeof(GLfloat));
+      objects[i].m = createMesh(objects[i].vertex_buffer_data, objects[i].index_buffer_data, objects[i].color_buffer_data, objects[11].vertices, objects[11].faces);
       memcpy(objects[i].vertex_buffer_data, objects[11].vertex_buffer_data, objects[11].vertices*3*sizeof(GLfloat));
       memcpy(objects[i].index_buffer_data, objects[11].index_buffer_data, objects[11].faces*3*sizeof(GLushort));
       memcpy(objects[i].color_buffer_data, objects[11].color_buffer_data, objects[11].vertices*3*sizeof(GLfloat));
-      memcpy(objects[i].normals, objects[11].normals, objects[11].faces*3*sizeof(GLfloat));
+      memcpy(objects[i].normal_buffer_data, objects[11].normal_buffer_data, objects[11].vertices*3*sizeof(GLfloat));
     }
 
     /* Initialize GLUT; set double buffered window and RGBA color model */
