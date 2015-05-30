@@ -14,7 +14,6 @@ void computeFaceNormal(face* f) {
   SetUnitVector(f->normal);
   destroyVector(v1sv0);
   destroyVector(v2sv0);
-  printf("%f\n",*f->normal->x);
 }
 
 void computeVertexNormal(vertex* v) {
@@ -23,7 +22,6 @@ void computeVertexNormal(vertex* v) {
     AddVector(&v->normal, f->normal, &v->normal);
   }
   SetUnitVector(&v->normal);
-  printf("%f\n",*v->normal.x);
 }
 
 mesh* createMesh(GLfloat* vertex_buffer_data, GLushort* index_buffer_data, GLfloat* color_buffer_data, GLfloat* normal_buffer_data, int facecount, int vertexcount) {

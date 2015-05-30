@@ -12,7 +12,7 @@
 
 /* OpenGL includes */
 #ifdef __APPLE__
-#include <OpenGL/gl.h>
+#include <OpenGL/gl3.h>
 #include <GLUT/glut.h>
 #else
 #include <GL/glew.h>
@@ -67,13 +67,17 @@ camera cam;
 
 // variables for camera path
 // =========================
-active = 0;
-direction = -1;
+int active = 0;
+int direction = -1;
 float t = 0.0;
 vector* p1;
 vector* p2;
 vector* p3;
 // =========================
+
+// Light
+GLfloat lightPos0[4];
+GLfloat lightColor0[4];
 
 typedef struct {
   int x;
@@ -93,8 +97,10 @@ enum DataID {vPosition = 0, vColor = 1, vNormal = 2};
 /* Strings for loading and storing shader code */
 static const char* VertexShaderString;
 static const char* FragmentShaderString;
+static const char* GeometryShaderString;
 
 GLuint ShaderProgram;
+GLuint ShaderProgram2;
 
 float ProjectionMatrix[16]; /* Perspective projection matrix */
 float ViewMatrix[16]; /* Camera view matrix */
@@ -286,6 +292,16 @@ void Display()
       }
       glUniformMatrix4fv(RotationUniform, 1, GL_TRUE, objects[i].ModelMatrix);
 
+      GLint LightUniform = glGetUniformLocation(ShaderProgram, "LightPosition");
+      if (LightUniform == -1) {
+        fprintf(stderr, "Could not bind uniform LightPosition");
+        exit(-1);
+      }
+      //lightPos0[0] = *cam.eye->x;
+      //lightPos0[1] = *cam.eye->y;
+      //lightPos0[2] = *cam.eye->z;
+      //lightPos0[3] = 0.0f;
+      glUniform4fv(LightUniform, 1, lightPos0);
       /* Set state to only draw wireframe (no lighting used, yet) */
       //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
@@ -466,7 +482,11 @@ void OnIdle()
     SetRotationY(angle, RotationMatrixAnim);
 
     /* Apply model rotation */
-    for(int i=0; i<count; i++) {
+    for(int i=0; i<6; i++) {
+      MultiplyMatrix(RotationMatrixAnim, objects[i].InitialTransform, objects[i].ModelMatrix);
+    }
+
+    for(int i=11; i<count; i++) {
       MultiplyMatrix(RotationMatrixAnim, objects[i].InitialTransform, objects[i].ModelMatrix);
     }
 
@@ -634,6 +654,58 @@ void CreateShaderProgram()
     glUseProgram(ShaderProgram);
 }
 
+void CreateShaderProgram2()
+{
+    /* Allocate shader object */
+    ShaderProgram2 = glCreateProgram();
+
+    if (ShaderProgram == 0)
+    {
+        fprintf(stderr, "Error creating shader program\n");
+        exit(1);
+    }
+
+    /* Load shader code from file */
+    VertexShaderString = LoadShader("shaders/vertexshader2.vs");
+    FragmentShaderString = LoadShader("shaders/fragmentshader2.fs");
+    GeometryShaderString = LoadShader("shaders/geometryshader.gs");
+
+    /* Separately add vertex and fragment shader to program */
+    AddShader(ShaderProgram2, VertexShaderString, GL_VERTEX_SHADER);
+    AddShader(ShaderProgram2, FragmentShaderString, GL_FRAGMENT_SHADER);
+    AddShader(ShaderProgram2, GeometryShaderString, GL_GEOMETRY_SHADER);
+
+    GLint Success = 0;
+    GLchar ErrorLog[1024];
+
+    /* Link shader code into executable shader program */
+    glLinkProgram(ShaderProgram2);
+
+    /* Check results of linking step */
+    glGetProgramiv(ShaderProgram2, GL_LINK_STATUS, &Success);
+
+    if (Success == 0)
+    {
+        glGetProgramInfoLog(ShaderProgram2, sizeof(ErrorLog), NULL, ErrorLog);
+        fprintf(stderr, "Error linking shader program: '%s'\n", ErrorLog);
+        exit(1);
+    }
+
+    /* Check if shader program can be executed */
+    glValidateProgram(ShaderProgram2);
+    glGetProgramiv(ShaderProgram2, GL_VALIDATE_STATUS, &Success);
+
+    if (!Success)
+    {
+        glGetProgramInfoLog(ShaderProgram2, sizeof(ErrorLog), NULL, ErrorLog);
+        fprintf(stderr, "Invalid shader program: '%s'\n", ErrorLog);
+        exit(1);
+    }
+
+    /* Put linked shader program into drawing pipeline */
+    glUseProgram(ShaderProgram2);
+}
+
 /******************************************************************
 *
 * Initialize
@@ -658,21 +730,20 @@ void Initialize()
     GLfloat ambientColor[] = {0.2f, 0.2f, 0.2f, 1.0f};
     glLightModelfv(GL_LIGHT_MODEL_AMBIENT,ambientColor);
 
-    GLfloat lightColor0[] = {0.5f, 0.5f, 0.5f, 1.0f};
-    GLfloat lightPos0[] = {50.0f, 50.0f, 50.0f, 1.0f};
-    glLightfv(GL_LIGHT0, GL_DIFFUSE, lightColor0);
-    glLightfv(GL_LIGHT0, GL_POSITION, lightPos0);
+    lightColor0[0] = 0.5f; lightColor0[1] = 0.5f; lightColor0[2] = 0.5f; lightColor0[3] = 1.0f;
+    lightPos0[0] = 0.0f; lightPos0[1] = 100.0f; lightPos0[2] = 0.0f; lightPos0[3] = 0.0f;
 
-    GLfloat lightColor1[] = {0.5f, 0.2f, 0.2f, 1.0f};
-    GLfloat lightPos1[] = {0.0f, 50.0f, 0.0f, 0.0f};
-    glLightfv(GL_LIGHT1, GL_DIFFUSE, lightColor1);
-    glLightfv(GL_LIGHT1, GL_POSITION, lightPos1);
+    //GLfloat lightColor1[] = {0.5f, 0.2f, 0.2f, 1.0f};
+    //GLfloat lightPos1[] = {0.0f, 50.0f, 0.0f, 0.0f};
+    //glLightfv(GL_LIGHT1, GL_DIFFUSE, lightColor1);
+    //glLightfv(GL_LIGHT1, GL_POSITION, lightPos1);
 
     /* Setup vertex, color, and index buffer objects */
     SetupDataBuffers();
 
     /* Setup shaders and shader program */
     CreateShaderProgram();
+    //CreateShaderProgram2();
 
     /* Initialize matrices */
     SetIdentityMatrix(ProjectionMatrix);
@@ -690,11 +761,11 @@ void Initialize()
     SetPerspectiveMatrix(fovy, aspect, nearPlane, farPlane, ProjectionMatrix);
 
     /* Initialize camera */
-    p1 = createVector(50.0f, 50.0f, 50.0f); // camera path
-    p2 = createVector(50.0f, 50.0f,  0.0f); // camera path
-    p3 = createVector(50.0f,  0.0f,  0.0f); // camera path
+    p1 = createVector(40.0f, 40.0f, 40.0f); // camera path
+    p2 = createVector(40.0f, 40.0f,  0.0f); // camera path
+    p3 = createVector(40.0f,  0.0f,  0.0f); // camera path
     cam.ctr = createVector(0.0f, 0.0f, 0.0f);
-    cam.eye = createVector(0.0f, 0.0f, 50.0f);
+    cam.eye = createVector(0.0f, 0.0f, 40.0f);
     cam.up = createVector(0.0f, 1.0f, 0.0f);
     cam.u = createVector(0.0f, 0.0f, 0.0f);
     cam.v = createVector(0.0f, 0.0f, 0.0f);
@@ -734,19 +805,19 @@ void Initialize()
     MultiplyMatrix(objects[5].RotateX, objects[5].TranslateOrigin, objects[5].InitialTransform);
 
     // transate first cuboid (floor)
-    SetTranslation(0, -12.5, 0, objects[6].InitialTransform);
+    SetTranslation(0, -12.51, 0, objects[6].ModelMatrix);
 
     // translate second cuboid (wall)
-    SetTranslation(0.0, 1.25, 48.875, objects[7].InitialTransform);
+    SetTranslation(0.0, 1.25, 48.875, objects[7].ModelMatrix);
 
     // translate third cuboid (wall)
-    SetTranslation(0.0, 1.25, -48.875, objects[8].InitialTransform);
+    SetTranslation(0.0, 1.25, -48.875, objects[8].ModelMatrix);
 
     // translate fourth cuboid (wall)
-    SetTranslation(48.875, 1.25, 0.0, objects[9].InitialTransform);
+    SetTranslation(48.875, 1.25, 0.0, objects[9].ModelMatrix);
 
     // translate fifth cuboid (wall)
-    SetTranslation(-48.875, 1.25, 0.0, objects[10].InitialTransform);
+    SetTranslation(-48.875, 1.25, 0.0, objects[10].ModelMatrix);
 
     // rotate, translate and scale first teddy
     SetTranslation(-50, 0, 0, objects[11].TranslateOrigin);
