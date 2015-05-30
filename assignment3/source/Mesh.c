@@ -14,6 +14,7 @@ void computeFaceNormal(face* f) {
   SetUnitVector(f->normal);
   destroyVector(v1sv0);
   destroyVector(v2sv0);
+  printf("%f\n",*f->normal->x);
 }
 
 void computeVertexNormal(vertex* v) {
@@ -22,6 +23,7 @@ void computeVertexNormal(vertex* v) {
     AddVector(&v->normal, f->normal, &v->normal);
   }
   SetUnitVector(&v->normal);
+  printf("%f\n",*v->normal.x);
 }
 
 mesh* createMesh(GLfloat* vertex_buffer_data, GLushort* index_buffer_data, GLfloat* color_buffer_data, GLfloat* normal_buffer_data, int facecount, int vertexcount) {
@@ -50,9 +52,9 @@ mesh* createMesh(GLfloat* vertex_buffer_data, GLushort* index_buffer_data, GLflo
     list_make(&v->facelist,4,1);
     for(int j=0; j < result->facecount; j++) {
       face* f = &result->faces[j];
-      if((vertex*) list_get_item(&result->vertexlist, &result->faces[i].vertices[0]) == v) list_add_item(&v->facelist, f, NULL);
-      if((vertex*) list_get_item(&result->vertexlist, &result->faces[i].vertices[1]) == v) list_add_item(&v->facelist, f, NULL);
-      if((vertex*) list_get_item(&result->vertexlist, &result->faces[i].vertices[2]) == v) list_add_item(&v->facelist, f, NULL);
+      if((vertex*) list_get_item(&result->vertexlist, &f->vertices[0]) == v) list_add_item(&v->facelist, f, NULL);
+      if((vertex*) list_get_item(&result->vertexlist, &f->vertices[1]) == v) list_add_item(&v->facelist, f, NULL);
+      if((vertex*) list_get_item(&result->vertexlist, &f->vertices[2]) == v) list_add_item(&v->facelist, f, NULL);
     }
     v->normal.x = &normal_buffer_data[i*3+0];
     v->normal.y = &normal_buffer_data[i*3+1];

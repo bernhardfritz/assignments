@@ -831,6 +831,7 @@ int main(int argc, char** argv)
     objects[11].index_buffer_data = malloc(objects[11].faces*3*sizeof(GLushort));
     objects[11].color_buffer_data = malloc(objects[11].vertices*3*sizeof(GLfloat));
     objects[11].normal_buffer_data = calloc(objects[11].vertices*3, sizeof(GLfloat));
+
     // Vertices
     for(int i=0; i<objects[11].vertices; i++) {
         objects[11].vertex_buffer_data[i*3] = (GLfloat)(*data.vertex_list[i]).e[0];
@@ -844,7 +845,7 @@ int main(int argc, char** argv)
 	      objects[11].index_buffer_data[i*3+2] = (GLushort)(*data.face_list[i]).vertex_index[2];
     }
     generateGeneralColorBuffer(objects[11].color_buffer_data, objects[11].vertices, 0.5f, 0.35f, 0.05f);
-    //objects[11].m = createMesh(objects[11].vertex_buffer_data, objects[11].index_buffer_data, objects[11].color_buffer_data, objects[11].vertices, objects[11].faces);
+    //objects[11].m = createMesh(objects[11].vertex_buffer_data, objects[11].index_buffer_data, objects[11].color_buffer_data, objects[11].normal_buffer_data, objects[11].vertices, objects[11].faces);
 
     for(int i=12; i<15; i++) {
       objects[i].vertices = objects[11].vertices;
@@ -853,7 +854,7 @@ int main(int argc, char** argv)
       objects[i].index_buffer_data = malloc(objects[i].faces*3*sizeof(GLushort));
       objects[i].color_buffer_data = malloc(objects[i].vertices*3*sizeof(GLfloat));
       objects[i].normal_buffer_data = calloc(objects[i].vertices*3, sizeof(GLfloat));
-      //objects[i].m = createMesh(objects[i].vertex_buffer_data, objects[i].index_buffer_data, objects[i].color_buffer_data, objects[11].vertices, objects[11].faces);
+      //objects[i].m = createMesh(objects[i].vertex_buffer_data, objects[i].index_buffer_data, objects[i].color_buffer_data, objects[i].normal_buffer_data, objects[11].vertices, objects[11].faces);
       memcpy(objects[i].vertex_buffer_data, objects[11].vertex_buffer_data, objects[11].vertices*3*sizeof(GLfloat));
       memcpy(objects[i].index_buffer_data, objects[11].index_buffer_data, objects[11].faces*3*sizeof(GLushort));
       memcpy(objects[i].color_buffer_data, objects[11].color_buffer_data, objects[11].vertices*3*sizeof(GLfloat));
