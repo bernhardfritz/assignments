@@ -120,15 +120,18 @@ void generateGeneralColorBuffer(GLfloat* result, int vertices, GLfloat r, GLfloa
 }
 
 void generateCuboidVertexBuffer(GLfloat* result, GLfloat width, GLfloat length, GLfloat height) {
+  GLfloat w = width/2.0;
+  GLfloat h = height/2.0;
+  GLfloat l = length/2.0;
   GLfloat temp[24] = {
-    width/2.0,          height/2.0,         length/2.0,
-    width/2.0,          height/2.0,         -length/2.0,
-    width/2.0,          -height/2.0,        length/2.0,
-    width/2.0,          -height/2.0,        -length/2.0,
-    -width/2.0,         height/2.0,         length/2.0,
-    -width/2.0,         height/2.0,         -length/2.0,
-    -width/2.0,         -height/2.0,        length/2.0,
-    -width/2.0,         -height/2.0,        -length/2.0
+    -w, -h,  l, // 0 --+
+     w, -h,  l, // 1 +-+
+    -w,  h,  l, // 2 -++
+     w,  h,  l, // 3 +++
+    -w, -h, -l, // 4 ---
+     w, -h, -l, // 5 +--
+    -w,  h, -l, // 6 -+-
+     w,  h, -l  // 7 ++-
   };
 
   memcpy(result, temp, 24*sizeof(GLfloat));
@@ -136,18 +139,18 @@ void generateCuboidVertexBuffer(GLfloat* result, GLfloat width, GLfloat length, 
 
 void generateCuboidIndexBuffer(GLushort* result) {
   GLushort temp[48] = {
-    0, 1, 2,
-    1, 2, 3,
-    1, 3, 5,
-    3, 5, 7,
-    4, 5, 7,
-    4, 6, 7,
-    0, 3, 6,
-    0, 5, 6,
-    0, 1, 4,
-    1, 4, 5,
-    2, 3, 6,
-    3, 6, 7
+    0,1,3,
+    0,3,2,
+    1,5,7,
+    1,7,3,
+    5,4,6,
+    5,6,7,
+    4,0,2,
+    4,2,6,
+    4,5,1,
+    4,1,0,
+    2,3,7,
+    2,7,6
   };
 
   memcpy(result, temp, 48*sizeof(GLushort));
@@ -187,14 +190,14 @@ void generateOctagonalPrismVertexBuffer(GLfloat* result, GLfloat radius, GLfloat
 
 void generateOctagonalPrismIndexBuffer(GLushort* result) {
   GLushort temp[96] = {
-      0, 1 , 2 ,
-      0, 2 , 3 ,
-      0, 3 , 4 ,
-      0, 4 , 5 ,
-      0, 5 , 6 ,
-      0, 6 , 7 ,
-      0, 7 , 8 ,
-      0, 8 , 1 ,
+      0, 2 , 1 ,
+      0, 3 , 2 ,
+      0, 4 , 3 ,
+      0, 5 , 4 ,
+      0, 6 , 5 ,
+      0, 7 , 6 ,
+      0, 8 , 7 ,
+      0, 1 , 8 ,
       9, 10, 11,
       9, 11, 12,
       9, 12, 13,
@@ -211,14 +214,14 @@ void generateOctagonalPrismIndexBuffer(GLushort* result) {
       6,  7, 16,
       7,  8, 17,
       8,  1, 10,
-      10, 11, 1,
-      11, 12, 2,
-      12, 13, 3,
-      13, 14, 4,
-      14, 15, 5,
-      15, 16, 6,
-      16, 17, 7,
-      17, 10, 8
+      10,  1,11,
+      11,  2,12,
+      12,  3,13,
+      13,  4,14,
+      14,  5,15,
+      15,  6,16,
+      16,  7,17,
+      17,  8,10
   };
 
   memcpy(result, temp, 96*sizeof(GLushort));
@@ -250,6 +253,9 @@ void Display()
     /* Clear window; color specified in 'Initialize()' */
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+    for(int asdf = 0; asdf<2; asdf++) {
+      if(asdf==0) glUseProgram(ShaderProgram);
+      else glUseProgram(ShaderProgram2);
     for(int i=0; i<count; i++) {
       glEnableVertexAttribArray(vPosition);
       glBindBuffer(GL_ARRAY_BUFFER, objects[i].VBO);
@@ -297,10 +303,10 @@ void Display()
         fprintf(stderr, "Could not bind uniform LightPosition");
         exit(-1);
       }
-      //lightPos0[0] = *cam.eye->x;
-      //lightPos0[1] = *cam.eye->y;
-      //lightPos0[2] = *cam.eye->z;
-      //lightPos0[3] = 0.0f;
+      /*lightPos0[0] = *cam.eye->x;
+      lightPos0[1] = *cam.eye->y;
+      lightPos0[2] = *cam.eye->z;
+      lightPos0[3] = 0.0f;*/
       glUniform4fv(LightUniform, 1, lightPos0);
       /* Set state to only draw wireframe (no lighting used, yet) */
       //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -312,6 +318,7 @@ void Display()
       glDisableVertexAttribArray(vPosition);
       glDisableVertexAttribArray(vColor);
       glDisableVertexAttribArray(vNormal);
+    }
     }
 
     /* Swap between front and back buffer */
@@ -432,7 +439,7 @@ void Keyboard(unsigned char key, int x, int y) {
             free(objects[i].index_buffer_data);
             free(objects[i].color_buffer_data);
             free(objects[i].normal_buffer_data);
-            destroyMesh(objects[i].m);
+            if(count<11) destroyMesh(objects[i].m);
           }
           free(objects);
           destroyVector(p1);
@@ -561,7 +568,7 @@ void SetupDataBuffers()
 *
 *******************************************************************/
 
-void AddShader(GLuint ShaderProgram, const char* ShaderCode, GLenum ShaderType)
+void AddShader(GLuint sProgram, const char* ShaderCode, GLenum ShaderType)
 {
     /* Create shader object */
     GLuint ShaderObj = glCreateShader(ShaderType);
@@ -590,7 +597,7 @@ void AddShader(GLuint ShaderProgram, const char* ShaderCode, GLenum ShaderType)
     }
 
     /* Associate shader with shader program */
-    glAttachShader(ShaderProgram, ShaderObj);
+    glAttachShader(sProgram, ShaderObj);
 }
 
 
@@ -723,6 +730,7 @@ void Initialize()
     /* Enable depth testing */
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
+    glEnable(GL_CULL_FACE);
 
     glEnable(GL_LIGHTING);
     glEnable(GL_LIGHT0);
@@ -743,7 +751,7 @@ void Initialize()
 
     /* Setup shaders and shader program */
     CreateShaderProgram();
-    //CreateShaderProgram2();
+    CreateShaderProgram2();
 
     /* Initialize matrices */
     SetIdentityMatrix(ProjectionMatrix);
