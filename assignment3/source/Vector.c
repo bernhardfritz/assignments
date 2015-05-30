@@ -49,17 +49,10 @@ void AddVector(vector* v1, vector* v2, vector* result) {
   *result->z = *v1->z + *v2->z;
 }
 
-vector* CloneVector(vector* v) {
-  return createVector(*v->x, *v->y, *v->z);
-}
-
 void SubtractVector(vector* v1, vector* v2, vector* result) {
-  vector* temp = CloneVector(v2);
-  *temp->x *= -1.0f;
-  *temp->y *= -1.0f;
-  *temp->z *= -1.0f;
-  AddVector(v1, temp, result);
-  destroyVector(temp);
+  *result->x = *v1->x - *v2->x;
+  *result->y = *v1->y - *v2->y;
+  *result->z = *v1->z - *v2->z;
 }
 
 void MultiplyVector(vector* v1, vector* v2, vector* result) {
@@ -69,7 +62,7 @@ void MultiplyVector(vector* v1, vector* v2, vector* result) {
 }
 
 void TranslateVector(float x, float y, float z, vector* result) {
-  vector* temp = createVector(x,z,y);
-  AddVector(result, temp, result);
-  destroyVector(temp);
+  *result->x += x;
+  *result->y += y;
+  *result->z += z;
 }
