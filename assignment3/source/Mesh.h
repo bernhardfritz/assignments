@@ -27,13 +27,13 @@ typedef struct {
 } vertex;
 
 typedef struct {
-  vertex vertices[3];
+  list vertexlist;
   vector* normal;
 } face;
 
 typedef struct {
   face* faces;
-  list vertexlist;
+  vertex* vertices;
   int facecount;
   int vertexcount;
 } mesh;

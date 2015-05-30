@@ -18,5 +18,7 @@ void main()
    gl_Position = ProjectionMatrix*ViewMatrix*ModelMatrix*vec4(Position.x, Position.y, Position.z, 1.0);
    vColor = vec4(Color, 1.0);
    vLight = normalize(vec3(LightPosition.x, LightPosition.y, LightPosition.z));
-   vNormal = Normal;
+   mat3 NormalMatrix = mat3(transpose(inverse(ModelMatrix)));
+   vNormal = normalize(vec3(ProjectionMatrix * vec4(NormalMatrix * Normal, 1.0)));
+   //vNormal = Normal;
 }
