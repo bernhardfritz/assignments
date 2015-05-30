@@ -11,6 +11,7 @@
 #endif
 
 #include "Vector.h"
+#include "List.h"
 
 typedef struct {
   float r;
@@ -22,6 +23,7 @@ typedef struct {
   vector position;
   vector normal;
   color c;
+  list facelist;
 } vertex;
 
 typedef struct {
@@ -31,13 +33,14 @@ typedef struct {
 
 typedef struct {
   face* faces;
+  list vertexlist;
   int facecount;
   int vertexcount;
 } mesh;
 
 void computeFaceNormal(face* f);
-void computePerVertexNormals(mesh* m);
-mesh* createMesh(GLfloat* vertex_buffer_data, GLushort* index_buffer_data, GLfloat* color_buffer_data, int facecount, int vertexcount);
+void computeVertexNormal(vertex* v);
+mesh* createMesh(GLfloat* vertex_buffer_data, GLushort* index_buffer_data, GLfloat* color_buffer_data, GLfloat* normal_buffer_data, int facecount, int vertexcount);
 void destroyMesh(mesh* m);
 
 #endif // __MATRIX_H__

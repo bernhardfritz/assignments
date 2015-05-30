@@ -151,7 +151,7 @@ void generateCuboid(object* obj, GLfloat width, GLfloat length, GLfloat height, 
   generateCuboidVertexBuffer(obj->vertex_buffer_data, width, length, height);
   generateCuboidIndexBuffer(obj->index_buffer_data);
   generateGeneralColorBuffer(obj->color_buffer_data, obj->vertices, r, g, b);
-  obj->m = createMesh(obj->vertex_buffer_data, obj->index_buffer_data, obj->color_buffer_data, obj->faces, obj->vertices);
+  obj->m = createMesh(obj->vertex_buffer_data, obj->index_buffer_data, obj->color_buffer_data, obj->normal_buffer_data, obj->faces, obj->vertices);
 }
 
 void generateOctagonalPrismVertexBuffer(GLfloat* result, GLfloat radius, GLfloat height) {
@@ -222,7 +222,7 @@ void generateOctagonalPrism(object* obj, GLfloat radius, GLfloat height, GLfloat
   generateOctagonalPrismVertexBuffer(obj->vertex_buffer_data, radius, height);
   generateOctagonalPrismIndexBuffer(obj->index_buffer_data);
   generateGeneralColorBuffer(obj->color_buffer_data, obj->vertices, r, g, b);
-  obj->m = createMesh(obj->vertex_buffer_data, obj->index_buffer_data, obj->color_buffer_data, obj->faces, obj->vertices);
+  obj->m = createMesh(obj->vertex_buffer_data, obj->index_buffer_data, obj->color_buffer_data, obj->normal_buffer_data, obj->faces, obj->vertices);
 }
 
 /*----------------------------------------------------------------*/
@@ -797,7 +797,7 @@ int main(int argc, char** argv)
       objects[i].vertex_buffer_data = malloc(objects[i].vertices*3*sizeof(GLfloat));
       objects[i].index_buffer_data = malloc(objects[i].faces*3*sizeof(GLfloat));
       objects[i].color_buffer_data = malloc(objects[i].vertices*3*sizeof(GLfloat));
-      objects[i].normal_buffer_data = malloc(objects[i].vertices*3*sizeof(GLfloat));
+      objects[i].normal_buffer_data = calloc(objects[i].vertices*3, sizeof(GLfloat));
     }
     generateOctagonalPrism(&objects[0],20.0,2.5,0.5f,0.5f,0.5f);
     generateOctagonalPrism(&objects[1],20.0,2.5,0.5f,0.5f,0.5f);
@@ -812,7 +812,7 @@ int main(int argc, char** argv)
       objects[i].vertex_buffer_data = malloc(objects[i].vertices*3*sizeof(GLfloat));
       objects[i].index_buffer_data = malloc(objects[i].faces*3*sizeof(GLushort));
       objects[i].color_buffer_data = malloc(objects[i].vertices*3*sizeof(GLfloat));
-      objects[i].normal_buffer_data = malloc(objects[i].vertices*3*sizeof(GLfloat));
+      objects[i].normal_buffer_data = calloc(objects[i].vertices*3, sizeof(GLfloat));
     }
     generateCuboid(&objects[6],100.0,100.0,2.5,0.0f,1.0f,0.0f);
     generateCuboid(&objects[7],100.0,2.5,25.0,0.0f,0.0f,1.0f);
@@ -830,7 +830,7 @@ int main(int argc, char** argv)
     objects[11].vertex_buffer_data = malloc(objects[11].vertices*3*sizeof(GLfloat));
     objects[11].index_buffer_data = malloc(objects[11].faces*3*sizeof(GLushort));
     objects[11].color_buffer_data = malloc(objects[11].vertices*3*sizeof(GLfloat));
-    objects[11].normal_buffer_data = malloc(objects[11].vertices*3*sizeof(GLfloat));
+    objects[11].normal_buffer_data = calloc(objects[11].vertices*3, sizeof(GLfloat));
     // Vertices
     for(int i=0; i<objects[11].vertices; i++) {
         objects[11].vertex_buffer_data[i*3] = (GLfloat)(*data.vertex_list[i]).e[0];
@@ -844,7 +844,7 @@ int main(int argc, char** argv)
 	      objects[11].index_buffer_data[i*3+2] = (GLushort)(*data.face_list[i]).vertex_index[2];
     }
     generateGeneralColorBuffer(objects[11].color_buffer_data, objects[11].vertices, 0.5f, 0.35f, 0.05f);
-    objects[11].m = createMesh(objects[11].vertex_buffer_data, objects[11].index_buffer_data, objects[11].color_buffer_data, objects[11].vertices, objects[11].faces);
+    //objects[11].m = createMesh(objects[11].vertex_buffer_data, objects[11].index_buffer_data, objects[11].color_buffer_data, objects[11].vertices, objects[11].faces);
 
     for(int i=12; i<15; i++) {
       objects[i].vertices = objects[11].vertices;
@@ -852,8 +852,8 @@ int main(int argc, char** argv)
       objects[i].vertex_buffer_data = malloc(objects[i].vertices*3*sizeof(GLfloat));
       objects[i].index_buffer_data = malloc(objects[i].faces*3*sizeof(GLushort));
       objects[i].color_buffer_data = malloc(objects[i].vertices*3*sizeof(GLfloat));
-      objects[i].normal_buffer_data = malloc(objects[i].vertices*3*sizeof(GLfloat));
-      objects[i].m = createMesh(objects[i].vertex_buffer_data, objects[i].index_buffer_data, objects[i].color_buffer_data, objects[11].vertices, objects[11].faces);
+      objects[i].normal_buffer_data = calloc(objects[i].vertices*3, sizeof(GLfloat));
+      //objects[i].m = createMesh(objects[i].vertex_buffer_data, objects[i].index_buffer_data, objects[i].color_buffer_data, objects[11].vertices, objects[11].faces);
       memcpy(objects[i].vertex_buffer_data, objects[11].vertex_buffer_data, objects[11].vertices*3*sizeof(GLfloat));
       memcpy(objects[i].index_buffer_data, objects[11].index_buffer_data, objects[11].faces*3*sizeof(GLushort));
       memcpy(objects[i].color_buffer_data, objects[11].color_buffer_data, objects[11].vertices*3*sizeof(GLfloat));
