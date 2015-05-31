@@ -256,69 +256,78 @@ void Display()
     for(int asdf = 0; asdf<2; asdf++) {
       if(asdf==0) glUseProgram(ShaderProgram);
       else glUseProgram(ShaderProgram2);
-    for(int i=0; i<count; i++) {
-      glEnableVertexAttribArray(vPosition);
-      glBindBuffer(GL_ARRAY_BUFFER, objects[i].VBO);
-      glVertexAttribPointer(vPosition, 3, GL_FLOAT, GL_FALSE, 0, 0);
+      for(int i=0; i<count; i++) {
+        glEnableVertexAttribArray(vPosition);
+        glBindBuffer(GL_ARRAY_BUFFER, objects[i].VBO);
+        glVertexAttribPointer(vPosition, 3, GL_FLOAT, GL_FALSE, 0, 0);
 
-      glEnableVertexAttribArray(vColor);
-      glBindBuffer(GL_ARRAY_BUFFER, objects[i].CBO);
-      glVertexAttribPointer(vColor, 3, GL_FLOAT,GL_FALSE, 0, 0);
+        glEnableVertexAttribArray(vColor);
+        glBindBuffer(GL_ARRAY_BUFFER, objects[i].CBO);
+        glVertexAttribPointer(vColor, 3, GL_FLOAT,GL_FALSE, 0, 0);
 
-      glEnableVertexAttribArray(vNormal);
-      glBindBuffer(GL_ARRAY_BUFFER, objects[i].NBO);
-      glVertexAttribPointer(vNormal, 3, GL_FLOAT, GL_FALSE, 0, 0);
+        glEnableVertexAttribArray(vNormal);
+        glBindBuffer(GL_ARRAY_BUFFER, objects[i].NBO);
+        glVertexAttribPointer(vNormal, 3, GL_FLOAT, GL_FALSE, 0, 0);
 
-      glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, objects[i].IBO);
-      GLint size;
-      glGetBufferParameteriv(GL_ELEMENT_ARRAY_BUFFER, GL_BUFFER_SIZE, &size);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, objects[i].IBO);
+        GLint size;
+        glGetBufferParameteriv(GL_ELEMENT_ARRAY_BUFFER, GL_BUFFER_SIZE, &size);
 
-      /* Associate program with shader matrices */
-      GLint projectionUniform = glGetUniformLocation(ShaderProgram, "ProjectionMatrix");
-      if (projectionUniform == -1)
-      {
-          fprintf(stderr, "Could not bind uniform ProjectionMatrix\n");
-  	      exit(-1);
-      }
-      glUniformMatrix4fv(projectionUniform, 1, GL_TRUE, ProjectionMatrix);
+        /* Associate program with shader matrices */
+        GLint projectionUniform = glGetUniformLocation(ShaderProgram, "ProjectionMatrix");
+        if (projectionUniform == -1)
+        {
+            fprintf(stderr, "Could not bind uniform ProjectionMatrix\n");
+    	      exit(-1);
+        }
+        glUniformMatrix4fv(projectionUniform, 1, GL_TRUE, ProjectionMatrix);
 
-      GLint ViewUniform = glGetUniformLocation(ShaderProgram, "ViewMatrix");
-      if (ViewUniform == -1)
-      {
-          fprintf(stderr, "Could not bind uniform ViewMatrix\n");
+        GLint ViewUniform = glGetUniformLocation(ShaderProgram, "ViewMatrix");
+        if (ViewUniform == -1)
+        {
+            fprintf(stderr, "Could not bind uniform ViewMatrix\n");
+            exit(-1);
+        }
+        glUniformMatrix4fv(ViewUniform, 1, GL_TRUE, ViewMatrix);
+
+        GLint RotationUniform = glGetUniformLocation(ShaderProgram, "ModelMatrix");
+        if (RotationUniform == -1)
+        {
+            fprintf(stderr, "Could not bind uniform ModelMatrix\n");
+            exit(-1);
+        }
+        glUniformMatrix4fv(RotationUniform, 1, GL_TRUE, objects[i].ModelMatrix);
+
+        GLint LightUniform = glGetUniformLocation(ShaderProgram, "LightPosition");
+        if (LightUniform == -1) {
+          fprintf(stderr, "Could not bind uniform LightPosition");
           exit(-1);
+        }
+        /*lightPos0[0] = *cam.eye->x;
+        lightPos0[1] = *cam.eye->y;
+        lightPos0[2] = *cam.eye->z;
+        lightPos0[3] = 0.0f;*/
+        glUniform4fv(LightUniform, 1, lightPos0);
+
+        GLint CameraUniform = glGetUniformLocation(ShaderProgram, "CameraPosition");
+        if (CameraUniform == -1) {
+          fprintf(stderr, "Could not bind uniform CameraPosition");
+        }
+        GLfloat cameraPosition[3] = {*cam.eye->x, *cam.eye->y, *cam.eye->z};
+        glUniform3fv(CameraUniform, 1, cameraPosition);
+
+        /* Set state to only draw wireframe (no lighting used, yet) */
+        //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+        /* Issue draw command, using indexed triangle list */
+        glDrawElements(GL_TRIANGLES, size/sizeof(GLushort), GL_UNSIGNED_SHORT, 0);
+        glVertex3f(lightPos0[0],lightPos0[1],lightPos0[2]);
+
+        /* Disable attributes */
+        glDisableVertexAttribArray(vPosition);
+        glDisableVertexAttribArray(vColor);
+        glDisableVertexAttribArray(vNormal);
       }
-      glUniformMatrix4fv(ViewUniform, 1, GL_TRUE, ViewMatrix);
-
-      GLint RotationUniform = glGetUniformLocation(ShaderProgram, "ModelMatrix");
-      if (RotationUniform == -1)
-      {
-          fprintf(stderr, "Could not bind uniform ModelMatrix\n");
-          exit(-1);
-      }
-      glUniformMatrix4fv(RotationUniform, 1, GL_TRUE, objects[i].ModelMatrix);
-
-      GLint LightUniform = glGetUniformLocation(ShaderProgram, "LightPosition");
-      if (LightUniform == -1) {
-        fprintf(stderr, "Could not bind uniform LightPosition");
-        exit(-1);
-      }
-      /*lightPos0[0] = *cam.eye->x;
-      lightPos0[1] = *cam.eye->y;
-      lightPos0[2] = *cam.eye->z;
-      lightPos0[3] = 0.0f;*/
-      glUniform4fv(LightUniform, 1, lightPos0);
-      /* Set state to only draw wireframe (no lighting used, yet) */
-      //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-
-      /* Issue draw command, using indexed triangle list */
-      glDrawElements(GL_TRIANGLES, size/sizeof(GLushort), GL_UNSIGNED_SHORT, 0);
-
-      /* Disable attributes */
-      glDisableVertexAttribArray(vPosition);
-      glDisableVertexAttribArray(vColor);
-      glDisableVertexAttribArray(vNormal);
-    }
     }
 
     /* Swap between front and back buffer */
@@ -463,10 +472,12 @@ void Keyboard(unsigned char key, int x, int y) {
 
 void Special(int key, int x, int y) {
   switch(key) {
-    case GLUT_KEY_UP: AddVector(cam.ctr, cam.up, cam.ctr); break;
-    case GLUT_KEY_LEFT: SubtractVector(cam.ctr, cam.u, cam.ctr); break;
-    case GLUT_KEY_DOWN: SubtractVector(cam.ctr, cam.up, cam.ctr); break;
-    case GLUT_KEY_RIGHT: AddVector(cam.ctr, cam.u, cam.ctr); break;
+    case GLUT_KEY_UP: lightPos0[2]++; break;
+    case GLUT_KEY_LEFT: lightPos0[0]--; break;
+    case GLUT_KEY_DOWN: lightPos0[2]--; break;
+    case GLUT_KEY_RIGHT: lightPos0[0]++; break;
+    case GLUT_KEY_PAGE_UP: lightPos0[1]++; break;
+    case GLUT_KEY_PAGE_DOWN: lightPos0[1]--; break;
   }
 
   updateCamera();
@@ -924,7 +935,7 @@ int main(int argc, char** argv)
 	      objects[11].index_buffer_data[i*3+2] = (GLushort)(*data.face_list[i]).vertex_index[2];
     }
     generateGeneralColorBuffer(objects[11].color_buffer_data, objects[11].vertices, 0.5f, 0.35f, 0.05f);
-    //objects[11].m = createMesh(objects[11].vertex_buffer_data, objects[11].index_buffer_data, objects[11].color_buffer_data, objects[11].normal_buffer_data, objects[11].vertices, objects[11].faces);
+    objects[11].m = createMesh(objects[11].vertex_buffer_data, objects[11].index_buffer_data, objects[11].color_buffer_data, objects[11].normal_buffer_data, objects[11].faces, objects[11].vertices);
 
     for(int i=12; i<15; i++) {
       objects[i].vertices = objects[11].vertices;
@@ -933,7 +944,7 @@ int main(int argc, char** argv)
       objects[i].index_buffer_data = malloc(objects[i].faces*3*sizeof(GLushort));
       objects[i].color_buffer_data = malloc(objects[i].vertices*3*sizeof(GLfloat));
       objects[i].normal_buffer_data = calloc(objects[i].vertices*3, sizeof(GLfloat));
-      //objects[i].m = createMesh(objects[i].vertex_buffer_data, objects[i].index_buffer_data, objects[i].color_buffer_data, objects[i].normal_buffer_data, objects[11].vertices, objects[11].faces);
+      //objects[i].m = createMesh(objects[i].vertex_buffer_data, objects[i].index_buffer_data, objects[i].color_buffer_data, objects[i].normal_buffer_data, objects[11].faces, objects[11].vertices);
       memcpy(objects[i].vertex_buffer_data, objects[11].vertex_buffer_data, objects[11].vertices*3*sizeof(GLfloat));
       memcpy(objects[i].index_buffer_data, objects[11].index_buffer_data, objects[11].faces*3*sizeof(GLushort));
       memcpy(objects[i].color_buffer_data, objects[11].color_buffer_data, objects[11].vertices*3*sizeof(GLfloat));
