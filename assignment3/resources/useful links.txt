@@ -1,0 +1,8 @@
+https://www.youtube.com/user/jeffchastine/videos
+http://stackoverflow.com/questions/8142388/in-what-order-should-i-send-my-vertices-to-opengl-for-culling
+https://aerotwist.com/tutorials/an-introduction-to-shaders-part-2/
+http://www.learnopengl.com/#!Advanced-OpenGL/Geometry-Shader
+http://blog.db-in.com/calculating-normals-and-tangent-space/
+https://github.com/tomdalling/opengl-series/blob/master/source/06_diffuse_lighting/resources/fragment-shader.txt
+http://stackoverflow.com/questions/4237896/im-very-confused-about-malloc-and-calloc-on-c
+http://stackoverflow.com/questions/18519586/calculate-normal-per-vertex-opengl
