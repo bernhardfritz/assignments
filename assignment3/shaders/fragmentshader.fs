@@ -1,5 +1,7 @@
 #version 330
 
+uniform int LightControl;
+
 in vec4 vColor;
 in vec3 vNormal;
 in vec3 vLight;
@@ -14,12 +16,10 @@ void main()
 
     vec3 E = normalize(-vCamera);
     vec3 H = normalize(vLight + E);
-    float I_S = pow(max(dot(vNormal,H),0.0),25);
-    vec4 specular = I_S*vec4(1.0,1.0,1.0,1.0); // white light
+    float I_S = max(dot(vNormal,H),0.0);
+    vec4 specular = pow(I_S,30)*vec4(1.0,1.0,1.0,1.0); // white light
 
-    FragColor = diffuse + specular;
-    //FragColor = diffuse;
-    //FragColor = vec4(vColor.r*I_D, vColor.g*I_D, vColor.b*I_D, 0.5);
-    //FragColor = vec4(vNormal, 1.0);
-    //FragColor = vColor;
+    vec4 ambient = vec4(0.1,0.1,0.1,1.0);
+
+    FragColor = (LightControl&1)*ambient + (LightControl&2)*diffuse + (LightControl&4)*specular;
 }

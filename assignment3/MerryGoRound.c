@@ -31,6 +31,11 @@
 
 /*----------------------------------------------------------------*/
 
+int AMBIENT =  0b001;
+int DIFFUSE =  0b010;
+int SPECULAR = 0b100;
+int lightcontrol = 7;
+
 typedef struct {
   mesh* m;
   GLuint VBO;
@@ -253,7 +258,7 @@ void Display()
     /* Clear window; color specified in 'Initialize()' */
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    for(int asdf = 0; asdf<2; asdf++) {
+    for(int asdf = 0; asdf<1; asdf++) {
       if(asdf==0) glUseProgram(ShaderProgram);
       else glUseProgram(ShaderProgram2);
       for(int i=0; i<count; i++) {
@@ -303,18 +308,18 @@ void Display()
           fprintf(stderr, "Could not bind uniform LightPosition");
           exit(-1);
         }
-        /*lightPos0[0] = *cam.eye->x;
-        lightPos0[1] = *cam.eye->y;
-        lightPos0[2] = *cam.eye->z;
+        /*lightPos0[0] = -*cam.ctr->x;
+        lightPos0[1] = -*cam.ctr->y;
+        lightPos0[2] = -*cam.ctr->z;
         lightPos0[3] = 0.0f;*/
         glUniform4fv(LightUniform, 1, lightPos0);
 
-        GLint CameraUniform = glGetUniformLocation(ShaderProgram, "CameraPosition");
-        if (CameraUniform == -1) {
-          fprintf(stderr, "Could not bind uniform CameraPosition");
+        GLint LightControlUniform = glGetUniformLocation(ShaderProgram, "LightControl");
+        if (LightUniform == -1) {
+          fprintf(stderr, "Could not bind uniform LightControl");
+          exit(-1);
         }
-        GLfloat cameraPosition[3] = {*cam.eye->x, *cam.eye->y, *cam.eye->z};
-        glUniform3fv(CameraUniform, 1, cameraPosition);
+        glUniform1i(LightControlUniform,lightcontrol);
 
         /* Set state to only draw wireframe (no lighting used, yet) */
         //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -441,6 +446,18 @@ void Keyboard(unsigned char key, int x, int y) {
          *cam.eye->x=(*p1->x); *cam.eye->y=(*p1->y); *cam.eye->z=(*p1->z);
          break;
        }
+       case '1': {
+         lightcontrol ^= AMBIENT;
+         break;
+       }
+       case '2': {
+         lightcontrol ^= DIFFUSE;
+         break;
+       }
+       case '3': {
+         lightcontrol ^= SPECULAR;
+         break;
+       }
        case 'q':
        case 'Q': {
          for(int i=0; i<count; i++) {
@@ -472,15 +489,13 @@ void Keyboard(unsigned char key, int x, int y) {
 
 void Special(int key, int x, int y) {
   switch(key) {
-    case GLUT_KEY_UP: lightPos0[2]++; break;
+    case GLUT_KEY_UP: lightPos0[2]--; break;
     case GLUT_KEY_LEFT: lightPos0[0]--; break;
-    case GLUT_KEY_DOWN: lightPos0[2]--; break;
+    case GLUT_KEY_DOWN: lightPos0[2]++; break;
     case GLUT_KEY_RIGHT: lightPos0[0]++; break;
     case GLUT_KEY_PAGE_UP: lightPos0[1]++; break;
     case GLUT_KEY_PAGE_DOWN: lightPos0[1]--; break;
   }
-
-  updateCamera();
 
   glutPostRedisplay();
 }
@@ -743,19 +758,8 @@ void Initialize()
     glDepthFunc(GL_LESS);
     glEnable(GL_CULL_FACE);
 
-    glEnable(GL_LIGHTING);
-    glEnable(GL_LIGHT0);
-
-    GLfloat ambientColor[] = {0.2f, 0.2f, 0.2f, 1.0f};
-    glLightModelfv(GL_LIGHT_MODEL_AMBIENT,ambientColor);
-
     lightColor0[0] = 0.5f; lightColor0[1] = 0.5f; lightColor0[2] = 0.5f; lightColor0[3] = 1.0f;
-    lightPos0[0] = 0.0f; lightPos0[1] = 100.0f; lightPos0[2] = 0.0f; lightPos0[3] = 0.0f;
-
-    //GLfloat lightColor1[] = {0.5f, 0.2f, 0.2f, 1.0f};
-    //GLfloat lightPos1[] = {0.0f, 50.0f, 0.0f, 0.0f};
-    //glLightfv(GL_LIGHT1, GL_DIFFUSE, lightColor1);
-    //glLightfv(GL_LIGHT1, GL_POSITION, lightPos1);
+    lightPos0[0] = 0.0f; lightPos0[1] = 50.0f; lightPos0[2] = 0.0f; lightPos0[3] = 1.0f;
 
     /* Setup vertex, color, and index buffer objects */
     SetupDataBuffers();
@@ -780,9 +784,9 @@ void Initialize()
     SetPerspectiveMatrix(fovy, aspect, nearPlane, farPlane, ProjectionMatrix);
 
     /* Initialize camera */
-    p1 = createVector(40.0f, 40.0f, 40.0f); // camera path
-    p2 = createVector(40.0f, 40.0f,  0.0f); // camera path
-    p3 = createVector(40.0f,  0.0f,  0.0f); // camera path
+    p1 = createVector(75.0f, 75.0f, 75.0f); // camera path
+    p2 = createVector(55.0f, 55.0f,  0.0f); // camera path
+    p3 = createVector(45.0f,  0.0f,  0.0f); // camera path
     cam.ctr = createVector(0.0f, 0.0f, 0.0f);
     cam.eye = createVector(0.0f, 0.0f, 40.0f);
     cam.up = createVector(0.0f, 1.0f, 0.0f);

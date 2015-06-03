@@ -1,8 +1,5 @@
 #version 330
 
-in vec4 vColor;
-in float I_D;
-
 out vec4 FragColor;
 
 void main()
