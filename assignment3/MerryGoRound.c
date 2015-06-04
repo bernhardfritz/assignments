@@ -26,6 +26,7 @@
 #include "Matrix.h"
 #include "Vector.h"
 #include "Bezier.h"
+#include "ColorConversion.h"
 #include "OBJParser.h"
 
 
@@ -35,6 +36,8 @@ int AMBIENT =  0b001;
 int DIFFUSE =  0b010;
 int SPECULAR = 0b100;
 int lightcontrol = 7;
+
+int HUE = 0;
 
 typedef struct {
   mesh* m;
@@ -82,7 +85,7 @@ vector* p3;
 
 // Light
 GLfloat lightPos0[4];
-GLfloat lightColor0[4];
+GLfloat lightCol0[4];
 
 typedef struct {
   int x;
@@ -303,8 +306,8 @@ void Display()
         }
         glUniformMatrix4fv(RotationUniform, 1, GL_TRUE, objects[i].ModelMatrix);
 
-        GLint LightUniform = glGetUniformLocation(ShaderProgram, "LightPosition");
-        if (LightUniform == -1) {
+        GLint LightPositionUniform = glGetUniformLocation(ShaderProgram, "LightPosition");
+        if (LightPositionUniform == -1) {
           fprintf(stderr, "Could not bind uniform LightPosition");
           exit(-1);
         }
@@ -312,10 +315,17 @@ void Display()
         lightPos0[1] = -*cam.ctr->y;
         lightPos0[2] = -*cam.ctr->z;
         lightPos0[3] = 0.0f;*/
-        glUniform4fv(LightUniform, 1, lightPos0);
+        glUniform4fv(LightPositionUniform, 1, lightPos0);
+
+        GLint LightColorUniform = glGetUniformLocation(ShaderProgram, "LightColor");
+        if (LightColorUniform == -1) {
+          fprintf(stderr, "Could not bind uniform LightPosition");
+          exit(-1);
+        }
+        glUniform4fv(LightColorUniform, 1, lightCol0);
 
         GLint LightControlUniform = glGetUniformLocation(ShaderProgram, "LightControl");
-        if (LightUniform == -1) {
+        if (LightControlUniform == -1) {
           fprintf(stderr, "Could not bind uniform LightControl");
           exit(-1);
         }
@@ -326,7 +336,8 @@ void Display()
 
         /* Issue draw command, using indexed triangle list */
         glDrawElements(GL_TRIANGLES, size/sizeof(GLushort), GL_UNSIGNED_SHORT, 0);
-        glVertex3f(lightPos0[0],lightPos0[1],lightPos0[2]);
+
+        glutSolidSphere(0.3, 5, 5);
 
         /* Disable attributes */
         glDisableVertexAttribArray(vPosition);
@@ -397,6 +408,16 @@ void Motion(int x, int y) {
   mouse.y = y;
 }
 
+void updateLightColor() {
+  hsv in;
+  in.h = (double) HUE;
+  in.s = 1.0;
+  in.v = 1.0;
+  rgb out = hsv2rgb(in);
+  lightCol0[0] = out.r;
+  lightCol0[1] = out.g;
+  lightCol0[2] = out.b;
+}
 
 /******************************************************************
 *
@@ -458,6 +479,16 @@ void Keyboard(unsigned char key, int x, int y) {
          lightcontrol ^= SPECULAR;
          break;
        }
+       case '+': {
+         HUE = (HUE + 1)%360;
+         updateLightColor();
+         break;
+       }
+       case '-': {
+         HUE = (HUE - 1)%360;
+         updateLightColor();
+         break;
+       }
        case 'q':
        case 'Q': {
          for(int i=0; i<count; i++) {
@@ -497,6 +528,8 @@ void Special(int key, int x, int y) {
     case GLUT_KEY_PAGE_DOWN: lightPos0[1]--; break;
   }
 
+  SetTranslation(lightPos0[0], lightPos0[1], lightPos0[2], objects[15].ModelMatrix);
+
   glutPostRedisplay();
 }
 
@@ -519,12 +552,12 @@ void OnIdle()
       MultiplyMatrix(RotationMatrixAnim, objects[i].InitialTransform, objects[i].ModelMatrix);
     }
 
-    for(int i=11; i<count; i++) {
+    for(int i=11; i<15; i++) {
       MultiplyMatrix(RotationMatrixAnim, objects[i].InitialTransform, objects[i].ModelMatrix);
     }
 
     /* Time dependent translation */
-    for(int i=11; i<count; i++) {
+    for(int i=11; i<15; i++) {
       float distance = sinf((angle+(i-6)*90)/16)*4;
       float TranslationMatrixAnim[16];
       SetTranslation(0, distance, 0, TranslationMatrixAnim);
@@ -758,7 +791,7 @@ void Initialize()
     glDepthFunc(GL_LESS);
     glEnable(GL_CULL_FACE);
 
-    lightColor0[0] = 0.5f; lightColor0[1] = 0.5f; lightColor0[2] = 0.5f; lightColor0[3] = 1.0f;
+    lightCol0[0] = 1.0f; lightCol0[1] = 1.0f; lightCol0[2] = 1.0f; lightCol0[3] = 1.0f;
     lightPos0[0] = 0.0f; lightPos0[1] = 50.0f; lightPos0[2] = 0.0f; lightPos0[3] = 1.0f;
 
     /* Setup vertex, color, and index buffer objects */
@@ -869,6 +902,9 @@ void Initialize()
     SetUniformScale(0.25, objects[14].UniformScale);
     MultiplyMatrix(objects[14].RotateY, objects[14].TranslateOrigin, objects[14].InitialTransform);
     MultiplyMatrix(objects[14].UniformScale, objects[14].InitialTransform, objects[14].InitialTransform);
+
+    // translate sphere
+    SetTranslation(lightPos0[0], lightPos0[1], lightPos0[2], objects[15].ModelMatrix);
 }
 
 
@@ -882,7 +918,7 @@ void Initialize()
 
 int main(int argc, char** argv)
 {
-    count = 15;
+    count = 16;
     objects = malloc(count*sizeof(object));
 
     for(int i=0; i<6; i++) {
@@ -954,6 +990,34 @@ int main(int argc, char** argv)
       memcpy(objects[i].color_buffer_data, objects[11].color_buffer_data, objects[11].vertices*3*sizeof(GLfloat));
       memcpy(objects[i].normal_buffer_data, objects[11].normal_buffer_data, objects[11].vertices*3*sizeof(GLfloat));
     }
+
+    char* fname2 = "models/sphere.obj";
+    obj_scene_data data2;
+    parse_obj_scene(&data2, fname2);
+
+    objects[15].vertices = data2.vertex_count;
+    objects[15].faces = data2.face_count;
+    //printf("%d %d\n",objects[15].vertices,objects[15].faces);
+    objects[15].vertex_buffer_data = malloc(objects[15].vertices*3*sizeof(GLfloat));
+    objects[15].index_buffer_data = malloc(objects[15].faces*3*sizeof(GLushort));
+    objects[15].color_buffer_data = malloc(objects[15].vertices*3*sizeof(GLfloat));
+    objects[15].normal_buffer_data = calloc(objects[15].vertices*3, sizeof(GLfloat));
+
+    // Vertices
+    for(int i=0; i<objects[15].vertices; i++) {
+        objects[15].vertex_buffer_data[i*3] = (GLfloat)(*data2.vertex_list[i]).e[0];
+	      objects[15].vertex_buffer_data[i*3+1] = (GLfloat)(*data2.vertex_list[i]).e[1];
+	      objects[15].vertex_buffer_data[i*3+2] = (GLfloat)(*data2.vertex_list[i]).e[2];
+    }
+    // Indices
+    for(int i=0; i<objects[15].faces; i++) {
+	      objects[15].index_buffer_data[i*3] = (GLushort)(*data2.face_list[i]).vertex_index[0];
+	      objects[15].index_buffer_data[i*3+1] = (GLushort)(*data2.face_list[i]).vertex_index[1];
+	      objects[15].index_buffer_data[i*3+2] = (GLushort)(*data2.face_list[i]).vertex_index[2];
+    }
+    generateGeneralColorBuffer(objects[15].color_buffer_data, objects[15].vertices, 1.0f, 1.0f, 1.0f);
+    objects[15].m = createMesh(objects[15].vertex_buffer_data, objects[15].index_buffer_data, objects[15].color_buffer_data, objects[15].normal_buffer_data, objects[15].faces, objects[15].vertices);
+
 
     /* Initialize GLUT; set double buffered window and RGBA color model */
     glutInit(&argc, argv);
