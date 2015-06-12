@@ -19,9 +19,9 @@
 #include <GL/freeglut.h>
 #endif
 
-
 /* Local includes */
 #include "LoadShader.h"   /* Provides loading function for shader code */
+#include "LoadTexture.h"  /* Provides loading function for BMP texture */
 #include "Mesh.h"
 #include "Matrix.h"
 #include "Vector.h"
@@ -45,12 +45,15 @@ typedef struct {
   GLuint IBO;
   GLuint CBO;
   GLuint NBO;
+  GLuint TBO;
   int vertices;
   int faces;
+  int textureIndex;
   GLfloat* vertex_buffer_data;
   GLushort* index_buffer_data;
   GLfloat* color_buffer_data;
   GLfloat* normal_buffer_data;
+  GLfloat* texture_buffer_data;
   float ModelMatrix[16];
   float TranslateOrigin[16];
   float RotateX[16];
@@ -87,6 +90,15 @@ vector* p3;
 GLfloat lightPos0[4];
 GLfloat lightCol0[4];
 
+/* Variables for texture handling */
+typedef struct {
+  GLuint TextureID;
+  GLuint TextureUniform;
+  TextureDataPtr TexturePtr;
+} texture;
+
+texture textures[2];
+
 typedef struct {
   int x;
   int y;
@@ -100,7 +112,7 @@ GLuint VAO;
 int count = 0;
 
 /* Indices to vertex attributes; in this case positon and color */
-enum DataID {vPosition = 0, vColor = 1, vNormal = 2};
+enum DataID {vPosition = 0, vColor = 1, vNormal = 2, vUV = 3};
 
 /* Strings for loading and storing shader code */
 static const char* VertexShaderString;
@@ -164,10 +176,27 @@ void generateCuboidIndexBuffer(GLushort* result) {
   memcpy(result, temp, 48*sizeof(GLushort));
 }
 
-void generateCuboid(object* obj, GLfloat width, GLfloat length, GLfloat height, GLfloat r, GLfloat g, GLfloat b) {
+void generateCuboidTextureBuffer(GLfloat* result) {
+  GLfloat temp[16] = {
+    0.0, 0.0, // 0
+    1.0, 0.0, // 1
+    0.0, 1.0, // 2
+    1.0, 1.0, // 3
+    1.0, 0.0, // 4
+    0.0, 0.0, // 5
+    1.0, 1.0, // 6
+    0.0, 1.0  // 7
+  };
+
+  memcpy(result, temp, 16*sizeof(GLfloat));
+}
+
+void generateCuboid(object* obj, GLfloat width, GLfloat length, GLfloat height, GLfloat r, GLfloat g, GLfloat b, int textureIndex) {
   generateCuboidVertexBuffer(obj->vertex_buffer_data, width, length, height);
   generateCuboidIndexBuffer(obj->index_buffer_data);
   generateGeneralColorBuffer(obj->color_buffer_data, obj->vertices, r, g, b);
+  generateCuboidTextureBuffer(obj->texture_buffer_data);
+  obj->textureIndex = textureIndex;
   obj->m = createMesh(obj->vertex_buffer_data, obj->index_buffer_data, obj->color_buffer_data, obj->normal_buffer_data, obj->faces, obj->vertices);
 }
 
@@ -277,6 +306,10 @@ void Display()
         glBindBuffer(GL_ARRAY_BUFFER, objects[i].NBO);
         glVertexAttribPointer(vNormal, 3, GL_FLOAT, GL_FALSE, 0, 0);
 
+        glEnableVertexAttribArray(vUV);
+        glBindBuffer(GL_ARRAY_BUFFER, objects[i].TBO);
+        glVertexAttribPointer(vUV, 2, GL_FLOAT, GL_FALSE, 0, 0);
+
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, objects[i].IBO);
         GLint size;
         glGetBufferParameteriv(GL_ELEMENT_ARRAY_BUFFER, GL_BUFFER_SIZE, &size);
@@ -331,18 +364,38 @@ void Display()
         }
         glUniform1i(LightControlUniform,lightcontrol);
 
+        GLint TextureIndexUniform = glGetUniformLocation(ShaderProgram, "TextureIndex");
+        if (TextureIndexUniform == -1) {
+          fprintf(stderr, "Could not bind uniform TextureIndex");
+          exit(-1);
+        }
+        glUniform1i(TextureIndexUniform, objects[i].textureIndex);
+
+        /* Activate first (and only) texture unit */
+        if(objects[i].textureIndex>-1) {
+          glActiveTexture(GL_TEXTURE0);
+
+          /* Bind current texture  */
+          glBindTexture(GL_TEXTURE_2D, textures[objects[i].textureIndex].TextureID);
+
+          /* Get texture uniform handle from fragment shader */
+          textures[objects[i].textureIndex].TextureUniform  = glGetUniformLocation(ShaderProgram, "myTextureSampler");
+
+          /* Set location of uniform sampler variable */
+          glUniform1i(textures[objects[i].textureIndex].TextureUniform, 0);
+        }
+
         /* Set state to only draw wireframe (no lighting used, yet) */
         //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
         /* Issue draw command, using indexed triangle list */
         glDrawElements(GL_TRIANGLES, size/sizeof(GLushort), GL_UNSIGNED_SHORT, 0);
 
-        glutSolidSphere(0.3, 5, 5);
-
         /* Disable attributes */
         glDisableVertexAttribArray(vPosition);
         glDisableVertexAttribArray(vColor);
         glDisableVertexAttribArray(vNormal);
+        glDisableVertexAttribArray(vUV);
       }
     }
 
@@ -616,6 +669,12 @@ void SetupDataBuffers()
       glBindBuffer(GL_ARRAY_BUFFER, objects[i].NBO);
       glBufferData(GL_ARRAY_BUFFER, objects[i].vertices*3*sizeof(GLfloat), objects[i].normal_buffer_data, GL_STATIC_DRAW);
     }
+
+    for(int i=0; i<count; i++) {
+      glGenBuffers(1, &objects[i].TBO);
+      glBindBuffer(GL_ARRAY_BUFFER, objects[i].TBO);
+      glBufferData(GL_ARRAY_BUFFER, objects[i].vertices*2*sizeof(GLfloat), objects[i].texture_buffer_data, GL_STATIC_DRAW);
+    }
 }
 
 
@@ -774,6 +833,94 @@ void CreateShaderProgram2()
 
 /******************************************************************
 *
+* SetupTexture
+*
+* This function is called to load the texture and initialize
+* texturing parameters
+*
+*******************************************************************/
+
+void SetupTextures(void)
+{
+    /* Allocate texture container */
+    textures[0].TexturePtr = malloc(sizeof(TextureDataPtr));
+
+    int success = LoadTexture("data/seamless_brick_texture.bmp", textures[0].TexturePtr);
+    if (!success)
+    {
+        printf("Error loading texture. Exiting.\n");
+	      exit(-1);
+    }
+
+    /* Create texture name and store in handle */
+    glGenTextures(1, &textures[0].TextureID);
+
+    /* Bind texture */
+    glBindTexture(GL_TEXTURE_2D, textures[0].TextureID);
+
+    /* Load texture image into memory */
+    glTexImage2D(GL_TEXTURE_2D,     /* Target texture */
+		 0,                 /* Base level */
+		 GL_RGB,            /* Each element is RGB triple */
+		 textures[0].TexturePtr->width,    /* Texture dimensions */
+     textures[0].TexturePtr->height,
+		 0,                 /* Border should be zero */
+		 GL_BGR,            /* Data storage format for BMP file */
+		 GL_UNSIGNED_BYTE,  /* Type of pixel data, one byte per channel */
+		 textures[0].TexturePtr->data);    /* Pointer to image data  */
+
+     /* Repeat texture on edges when tiling */
+     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+     /* Linear interpolation for magnification */
+     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+     /* Trilinear MIP mapping for minification */
+     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+     glGenerateMipmap(GL_TEXTURE_2D);
+
+     textures[1].TexturePtr = malloc(sizeof(TextureDataPtr));
+
+     success = LoadTexture("data/seamless_grass_texture.bmp", textures[1].TexturePtr);
+     if (!success)
+     {
+         printf("Error loading texture. Exiting.\n");
+         exit(-1);
+     }
+
+     glGenTextures(1, &textures[1].TextureID);
+
+     glBindTexture(GL_TEXTURE_2D, textures[1].TextureID);
+
+     glTexImage2D(GL_TEXTURE_2D,     /* Target texture */
+ 		 0,                 /* Base level */
+ 		 GL_RGB,            /* Each element is RGB triple */
+ 		 textures[1].TexturePtr->width,    /* Texture dimensions */
+     textures[1].TexturePtr->height,
+ 		 0,                 /* Border should be zero */
+ 		 GL_BGR,            /* Data storage format for BMP file */
+ 		 GL_UNSIGNED_BYTE,  /* Type of pixel data, one byte per channel */
+ 		 textures[1].TexturePtr->data);    /* Pointer to image data  */
+
+    /* Next set up texturing parameters */
+
+    /* Repeat texture on edges when tiling */
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+    /* Linear interpolation for magnification */
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    /* Trilinear MIP mapping for minification */
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glGenerateMipmap(GL_TEXTURE_2D);
+
+    /* Note: MIP mapping not visible due to fixed, i.e. static camera */
+}
+
+/******************************************************************
+*
 * Initialize
 *
 * This function is called to initialize rendering elements, setup
@@ -800,6 +947,8 @@ void Initialize()
     /* Setup shaders and shader program */
     CreateShaderProgram();
     CreateShaderProgram2();
+
+    SetupTextures();
 
     /* Initialize matrices */
     SetIdentityMatrix(ProjectionMatrix);
@@ -861,7 +1010,10 @@ void Initialize()
     MultiplyMatrix(objects[5].RotateX, objects[5].TranslateOrigin, objects[5].InitialTransform);
 
     // transate first cuboid (floor)
-    SetTranslation(0, -12.51, 0, objects[6].ModelMatrix);
+    SetRotationX(90, objects[6].RotateX);
+    MultiplyMatrix(objects[6].RotateX, objects[6].InitialTransform, objects[6].InitialTransform);
+    SetTranslation(0, -12.51, 0, objects[6].TranslateOrigin);
+    MultiplyMatrix(objects[6].TranslateOrigin, objects[6].InitialTransform, objects[6].ModelMatrix);
 
     // translate second cuboid (wall)
     SetTranslation(0.0, 1.25, 48.875, objects[7].ModelMatrix);
@@ -924,10 +1076,12 @@ int main(int argc, char** argv)
     for(int i=0; i<6; i++) {
       objects[i].vertices=18;
       objects[i].faces=32;
+      objects[i].textureIndex=-1;
       objects[i].vertex_buffer_data = malloc(objects[i].vertices*3*sizeof(GLfloat));
       objects[i].index_buffer_data = malloc(objects[i].faces*3*sizeof(GLfloat));
       objects[i].color_buffer_data = malloc(objects[i].vertices*3*sizeof(GLfloat));
       objects[i].normal_buffer_data = calloc(objects[i].vertices*3, sizeof(GLfloat));
+      objects[i].texture_buffer_data = calloc(objects[i].vertices*2, sizeof(GLfloat));
     }
     generateOctagonalPrism(&objects[0],20.0,2.5,0.5f,0.5f,0.5f);
     generateOctagonalPrism(&objects[1],20.0,2.5,0.5f,0.5f,0.5f);
@@ -939,16 +1093,18 @@ int main(int argc, char** argv)
     for(int i=6; i<11; i++) {
       objects[i].vertices = 8;
       objects[i].faces = 12;
+      objects[i].textureIndex=-1;
       objects[i].vertex_buffer_data = malloc(objects[i].vertices*3*sizeof(GLfloat));
       objects[i].index_buffer_data = malloc(objects[i].faces*3*sizeof(GLushort));
       objects[i].color_buffer_data = malloc(objects[i].vertices*3*sizeof(GLfloat));
       objects[i].normal_buffer_data = calloc(objects[i].vertices*3, sizeof(GLfloat));
+      objects[i].texture_buffer_data = calloc(objects[i].vertices*2, sizeof(GLfloat));
     }
-    generateCuboid(&objects[6],100.0,100.0,2.5,0.0f,1.0f,0.0f);
-    generateCuboid(&objects[7],100.0,2.5,25.0,0.0f,0.0f,1.0f);
-    generateCuboid(&objects[8],100.0,2.5,25.0,0.0f,0.0f,1.0f);
-    generateCuboid(&objects[9],2.5,100.0,25.0,0.0f,0.0f,1.0f);
-    generateCuboid(&objects[10],2.5,100.0,25.0,0.0f,0.0f,1.0f);
+    generateCuboid(&objects[6],100.0,2.5,100.0,0.0f,1.0f,0.0f,1);
+    generateCuboid(&objects[7],100.0,2.5,25.0,0.0f,0.0f,1.0f,0);
+    generateCuboid(&objects[8],100.0,2.5,25.0,0.0f,0.0f,1.0f,0);
+    generateCuboid(&objects[9],2.5,100.0,25.0,0.0f,0.0f,1.0f,0);
+    generateCuboid(&objects[10],2.5,100.0,25.0,0.0f,0.0f,1.0f,0);
 
     char* fname="models/teddy.obj";
     obj_scene_data data;
@@ -956,11 +1112,13 @@ int main(int argc, char** argv)
 
     objects[11].vertices = data.vertex_count;
     objects[11].faces = data.face_count;
+    objects[11].textureIndex = -1;
     //printf("%d %d\n",objects[11].vertices,objects[11].faces);
     objects[11].vertex_buffer_data = malloc(objects[11].vertices*3*sizeof(GLfloat));
     objects[11].index_buffer_data = malloc(objects[11].faces*3*sizeof(GLushort));
     objects[11].color_buffer_data = malloc(objects[11].vertices*3*sizeof(GLfloat));
     objects[11].normal_buffer_data = calloc(objects[11].vertices*3, sizeof(GLfloat));
+    objects[11].texture_buffer_data = calloc(objects[11].vertices*2, sizeof(GLfloat));
 
     // Vertices
     for(int i=0; i<objects[11].vertices; i++) {
@@ -980,15 +1138,18 @@ int main(int argc, char** argv)
     for(int i=12; i<15; i++) {
       objects[i].vertices = objects[11].vertices;
       objects[i].faces = objects[11].faces;
+      objects[i].textureIndex = -1;
       objects[i].vertex_buffer_data = malloc(objects[i].vertices*3*sizeof(GLfloat));
       objects[i].index_buffer_data = malloc(objects[i].faces*3*sizeof(GLushort));
       objects[i].color_buffer_data = malloc(objects[i].vertices*3*sizeof(GLfloat));
       objects[i].normal_buffer_data = calloc(objects[i].vertices*3, sizeof(GLfloat));
+      objects[i].texture_buffer_data = calloc(objects[i].vertices*2, sizeof(GLfloat));
       //objects[i].m = createMesh(objects[i].vertex_buffer_data, objects[i].index_buffer_data, objects[i].color_buffer_data, objects[i].normal_buffer_data, objects[11].faces, objects[11].vertices);
       memcpy(objects[i].vertex_buffer_data, objects[11].vertex_buffer_data, objects[11].vertices*3*sizeof(GLfloat));
       memcpy(objects[i].index_buffer_data, objects[11].index_buffer_data, objects[11].faces*3*sizeof(GLushort));
       memcpy(objects[i].color_buffer_data, objects[11].color_buffer_data, objects[11].vertices*3*sizeof(GLfloat));
       memcpy(objects[i].normal_buffer_data, objects[11].normal_buffer_data, objects[11].vertices*3*sizeof(GLfloat));
+      memcpy(objects[i].texture_buffer_data, objects[11].texture_buffer_data, objects[11].vertices*2*sizeof(GLfloat));
     }
 
     char* fname2 = "models/sphere.obj";
@@ -997,11 +1158,13 @@ int main(int argc, char** argv)
 
     objects[15].vertices = data2.vertex_count;
     objects[15].faces = data2.face_count;
+    objects[15].textureIndex = -1;
     //printf("%d %d\n",objects[15].vertices,objects[15].faces);
     objects[15].vertex_buffer_data = malloc(objects[15].vertices*3*sizeof(GLfloat));
     objects[15].index_buffer_data = malloc(objects[15].faces*3*sizeof(GLushort));
     objects[15].color_buffer_data = malloc(objects[15].vertices*3*sizeof(GLfloat));
     objects[15].normal_buffer_data = calloc(objects[15].vertices*3, sizeof(GLfloat));
+    objects[15].texture_buffer_data = calloc(objects[15].vertices*2, sizeof(GLfloat));
 
     // Vertices
     for(int i=0; i<objects[15].vertices; i++) {

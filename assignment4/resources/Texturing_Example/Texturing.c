@@ -2,14 +2,14 @@
 *
 * Texturing.c
 *
-* Description: This file demonstrates basic texturing of two 
+* Description: This file demonstrates basic texturing of two
 * triangles in shader-based OpenGL. The texture is provided as
 * a BMP file and loaded during runtime. UV coordinates are
 * given directly in the code. There is no lighting, projection,
 * etc.
-* 	
+*
 * Computer Graphics Proseminar SS 2015
-* 
+*
 * Interactive Graphics and Simulation Group
 * Institute of Computer Science
 * University of Innsbruck
@@ -23,8 +23,13 @@
 #include <string.h>
 
 /* OpenGL includes */
+#ifdef __APPLE__
+#include <OpenGL/gl3.h>
+#include <GLUT/glut.h>
+#else
 #include <GL/glew.h>
 #include <GL/freeglut.h>
+#endif
 
 /* Local includes */
 #include "LoadShader.h"   /* Provides loading function for shader code */
@@ -33,7 +38,8 @@
 /*----------------------------------------------------------------*/
 
 /* Handle to vertex buffer object */
-GLuint VBO; 
+GLuint VBO;
+GLuint VAO;
 
 GLuint ShaderProgram;
 
@@ -42,8 +48,8 @@ GLuint TextureID;
 GLuint TextureUniform;
 TextureDataPtr Texture;
 
-/* Indices to vertex attributes; in this case positon and texture coordinates */ 
-enum DataID {vPosition = 0, vUV = 1}; 
+/* Indices to vertex attributes; in this case positon and texture coordinates */
+enum DataID {vPosition = 0, vUV = 1};
 
 /* Strings for loading and storing shader code */
 static const char* VertexShaderString;
@@ -52,8 +58,8 @@ static const char* FragmentShaderString;
 
 const GLuint numVertices = 6;
 
-/* Structure containing XYZ position and RGB color data */  
-typedef struct 
+/* Structure containing XYZ position and RGB color data */
+typedef struct
 {
     GLfloat Position[3];
     GLfloat UV[2];
@@ -61,7 +67,7 @@ typedef struct
 
 /* Define vertex positions and UV coordinates */
 VertexData Vertices[] =
-{ 
+{
     {{-0.95, -0.90, 0.0}, {0.0, 0.0}},   /* Triangle 1 */
     {{ 0.90,  0.95, 0.0}, {1.0, 1.0}},
     {{-0.95,  0.95, 0.0}, {0.0, 1.0}},
@@ -80,7 +86,7 @@ VertexData Vertices[] =
 *
 * This function is called when the content of the window needs to be
 * drawn/redrawn. It has been specified through 'glutDisplayFunc()';
-* Enable vertex attributes, create binding between C program and 
+* Enable vertex attributes, create binding between C program and
 * attribute name in shader
 *
 *******************************************************************/
@@ -98,11 +104,11 @@ void Display()
 
     /* Bind current texture  */
     glBindTexture(GL_TEXTURE_2D, TextureID);
-    
-    /* Get texture uniform handle from fragment shader */ 
+
+    /* Get texture uniform handle from fragment shader */
     TextureUniform  = glGetUniformLocation(ShaderProgram, "myTextureSampler");
 
-    /* Set location of uniform sampler variable */ 
+    /* Set location of uniform sampler variable */
     glUniform1i(TextureUniform, 0);
 
     /* Enable position and UV attribute */
@@ -111,17 +117,17 @@ void Display()
 
     /* For each vertex attribue specify location of data */
     glVertexAttribPointer(vPosition, 3, GL_FLOAT, GL_FALSE, sizeof(VertexData), 0);
-    glVertexAttribPointer(vUV, 2, GL_FLOAT, GL_FALSE, sizeof(VertexData), 
-			  (const GLvoid*) sizeof(Vertices[0].Position)); 
-  
+    glVertexAttribPointer(vUV, 2, GL_FLOAT, GL_FALSE, sizeof(VertexData),
+			  (const GLvoid*) sizeof(Vertices[0].Position));
+
     /* Issue draw command; use triangles as primitives */
     glDrawArrays(GL_TRIANGLES, 0, numVertices);
 
     /* Disable attributes */
     glDisableVertexAttribArray(vPosition);
-    glDisableVertexAttribArray(vUV);   
+    glDisableVertexAttribArray(vUV);
 
-    /* Swap between front and back buffer */ 
+    /* Swap between front and back buffer */
     glutSwapBuffers();
 }
 
@@ -138,12 +144,15 @@ void SetupVertexBuffer()
 {
     /* Generate one buffer name and store in handle */
     glGenBuffers(1, &VBO);
-  
+
     /* Create new buffer object and assign name */
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
- 
+
     /* Load data into buffer object */
     glBufferData(GL_ARRAY_BUFFER, sizeof(Vertices), Vertices, GL_STATIC_DRAW);
+
+    glGenVertexArrays(1, &VAO);
+    glBindVertexArray(VAO);
 }
 
 
@@ -160,7 +169,7 @@ void AddShader(GLuint ShaderProgram, const char* ShaderCode, GLenum ShaderType)
     /* Create shader object */
     GLuint ShaderObj = glCreateShader(ShaderType);
 
-    if (ShaderObj == 0) 
+    if (ShaderObj == 0)
     {
         fprintf(stderr, "Error creating shader type %d\n", ShaderType);
         exit(0);
@@ -176,7 +185,7 @@ void AddShader(GLuint ShaderProgram, const char* ShaderCode, GLenum ShaderType)
     glCompileShader(ShaderObj);
     glGetShaderiv(ShaderObj, GL_COMPILE_STATUS, &success);
 
-    if (!success) 
+    if (!success)
     {
         glGetShaderInfoLog(ShaderObj, 1024, NULL, InfoLog);
         fprintf(stderr, "Error compiling shader type %d: '%s'\n", ShaderType, InfoLog);
@@ -194,7 +203,7 @@ void AddShader(GLuint ShaderProgram, const char* ShaderCode, GLenum ShaderType)
 *
 * This function creates the shader program; vertex and fragment
 * shaders are loaded and linked into program; final shader program
-* is put into the rendering pipeline 
+* is put into the rendering pipeline
 *
 *******************************************************************/
 
@@ -203,7 +212,7 @@ void CreateShaderProgram()
     /* Allocate shader object */
     ShaderProgram = glCreateProgram();
 
-    if (ShaderProgram == 0) 
+    if (ShaderProgram == 0)
     {
         fprintf(stderr, "Error creating shader program\n");
         exit(1);
@@ -226,18 +235,18 @@ void CreateShaderProgram()
     /* Check results of linking step */
     glGetProgramiv(ShaderProgram, GL_LINK_STATUS, &Success);
 
-    if (Success == 0) 
+    if (Success == 0)
     {
         glGetProgramInfoLog(ShaderProgram, sizeof(ErrorLog), NULL, ErrorLog);
         fprintf(stderr, "Error linking shader program: '%s'\n", ErrorLog);
         exit(1);
     }
 
-    /* Check if shader program can be executed */ 
+    /* Check if shader program can be executed */
     glValidateProgram(ShaderProgram);
     glGetProgramiv(ShaderProgram, GL_VALIDATE_STATUS, &Success);
 
-    if (!Success) 
+    if (!Success)
     {
         glGetProgramInfoLog(ShaderProgram, sizeof(ErrorLog), NULL, ErrorLog);
         fprintf(stderr, "Invalid shader program: '%s'\n", ErrorLog);
@@ -259,7 +268,7 @@ void CreateShaderProgram()
 *******************************************************************/
 
 void SetupTexture(void)
-{	
+{
     /* Allocate texture container */
     Texture = malloc(sizeof(TextureDataPtr));
 
@@ -267,26 +276,26 @@ void SetupTexture(void)
     if (!success)
     {
         printf("Error loading texture. Exiting.\n");
-	exit(-1);
+	      exit(-1);
     }
 
     /* Create texture name and store in handle */
     glGenTextures(1, &TextureID);
-	
+
     /* Bind texture */
     glBindTexture(GL_TEXTURE_2D, TextureID);
 
     /* Load texture image into memory */
     glTexImage2D(GL_TEXTURE_2D,     /* Target texture */
 		 0,                 /* Base level */
-		 GL_RGB,            /* Each element is RGB triple */ 
-		 Texture->width,    /* Texture dimensions */ 
-            Texture->height, 
+		 GL_RGB,            /* Each element is RGB triple */
+		 Texture->width,    /* Texture dimensions */
+            Texture->height,
 		 0,                 /* Border should be zero */
 		 GL_BGR,            /* Data storage format for BMP file */
 		 GL_UNSIGNED_BYTE,  /* Type of pixel data, one byte per channel */
 		 Texture->data);    /* Pointer to image data  */
- 
+
     /* Next set up texturing parameters */
 
     /* Repeat texture on edges when tiling */
@@ -296,9 +305,9 @@ void SetupTexture(void)
     /* Linear interpolation for magnification */
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-    /* Trilinear MIP mapping for minification */ 
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR); 
-    glGenerateMipmap(GL_TEXTURE_2D); 
+    /* Trilinear MIP mapping for minification */
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glGenerateMipmap(GL_TEXTURE_2D);
 
     /* Note: MIP mapping not visible due to fixed, i.e. static camera */
 }
@@ -313,8 +322,8 @@ void SetupTexture(void)
 *******************************************************************/
 
 void Initialize(void)
-{	
-    /* Set background (clear) color to black */ 
+{
+    /* Set background (clear) color to black */
     glClearColor(0.0, 0.0, 0.0, 0.0);
 
     /* Setup Vertex buffer object */
@@ -340,18 +349,20 @@ int main(int argc, char** argv)
 {
     /* Initialize GLUT; set double buffered window and RGBA color model */
     glutInit(&argc, argv);
-    glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA);
+    glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA | GLUT_3_2_CORE_PROFILE);
     glutInitWindowSize(600, 600);
     glutInitWindowPosition(400, 400);
     glutCreateWindow("CG Proseminar - Basic Textured Triangles");
 
     /* Initialize GL extension wrangler */
+    #ifndef __APPLE__
     GLenum res = glewInit();
-    if (res != GLEW_OK) 
+    if (res != GLEW_OK)
     {
         fprintf(stderr, "Error: '%s'\n", glewGetErrorString(res));
         return 1;
     }
+    #endif
 
     Initialize();
 
